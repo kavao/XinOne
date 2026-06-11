@@ -19,6 +19,7 @@ export class MinesweeperGameScene extends Phaser.Scene {
   private statusText!: Phaser.GameObjects.Text;
   private mineText!: Phaser.GameObjects.Text;
   private timerText!: Phaser.GameObjects.Text;
+  private explosionParticles!: Phaser.GameObjects.Particles.ParticleEmitter;
   private startedAt?: number;
 
   constructor() {
@@ -55,12 +56,54 @@ export class MinesweeperGameScene extends Phaser.Scene {
     addButton(this, 1200, 675, 'Full', () => void this.runtime.toggleFullscreen(), 100);
 
     this.boardContainer = this.add.container(0, 0);
+    this.createExplosionParticles();
     this.renderBoard();
   }
 
   update(): void {
     if (this.startedAt && this.board.status === 'playing') {
       this.timerText.setText(`Time: ${Math.floor((Date.now() - this.startedAt) / 1000)}`);
+    }
+  }
+
+  private createExplosionParticles(): void {
+    if (!this.textures.exists('minesweeper-explosion-particle')) {
+      const square = this.make.graphics({ x: 0, y: 0 }, false);
+      square.fillStyle(0xffffff, 1);
+      square.fillRect(0, 0, 8, 8);
+      square.generateTexture('minesweeper-explosion-particle', 8, 8);
+      square.destroy();
+    }
+    this.explosionParticles = this.add.particles(0, 0, 'minesweeper-explosion-particle', {
+      lifespan: 650,
+      speed: { min: 120, max: 420 },
+      angle: { min: 0, max: 360 },
+      scale: { start: 1.4, end: 0 },
+      rotate: { start: 0, end: 360 },
+      gravityY: 550,
+      tint: [0xff5f4d, 0xffae42, 0x8a1f1f, 0x3a2a2a, 0xffd166],
+      emitting: false,
+    }).setDepth(5);
+  }
+
+  private spawnExplosionRings(x: number, y: number, cellSize: number): void {
+    const rings = [
+      { color: 0xfff3c4, scale: 5, duration: 350, delay: 0 },
+      { color: 0xffae42, scale: 7, duration: 450, delay: 60 },
+      { color: 0xff5f4d, scale: 9, duration: 550, delay: 120 },
+    ];
+    for (const ring of rings) {
+      const circle = this.add.circle(x, y, cellSize * 0.4, ring.color, 0).setDepth(5);
+      circle.setStrokeStyle(3, ring.color, 0.85);
+      this.tweens.add({
+        targets: circle,
+        scale: ring.scale,
+        alpha: 0,
+        delay: ring.delay,
+        duration: ring.duration,
+        ease: 'Cubic.easeOut',
+        onComplete: () => circle.destroy(),
+      });
     }
   }
 
@@ -106,7 +149,11 @@ export class MinesweeperGameScene extends Phaser.Scene {
       }
       if (previousStatus !== 'won' && previousStatus !== 'lost') {
         if (this.board.status === 'won') playOutcomeSound(this, 'victory');
-        else if (this.board.status === 'lost') playOutcomeSound(this, 'defeat');
+        else if (this.board.status === 'lost') {
+          playOutcomeSound(this, 'defeat');
+          this.explosionParticles.explode(40, x + size / 2, y + size / 2);
+          this.spawnExplosionRings(x + size / 2, y + size / 2, size);
+        }
       }
       this.renderBoard();
     });

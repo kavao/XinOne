@@ -19,6 +19,7 @@ export class HockeyGameScene extends Phaser.Scene {
   private speedText!: Phaser.GameObjects.Text;
   private playerLabel?: Phaser.GameObjects.Text;
   private cpuLabel?: Phaser.GameObjects.Text;
+  private goalParticles!: Phaser.GameObjects.Particles.ParticleEmitter;
   private playerHasMoved = false;
   private resultShown = false;
 
@@ -68,6 +69,7 @@ export class HockeyGameScene extends Phaser.Scene {
       this.playerHasMoved = true;
     });
     this.createPaddleLabels();
+    this.createGoalParticles();
     this.render();
   }
 
@@ -76,10 +78,38 @@ export class HockeyGameScene extends Phaser.Scene {
     const playerTarget = this.playerHasMoved
       ? { x: pointer.worldX, y: pointer.worldY }
       : { ...this.match.player };
+    const previousPlayerScore = this.match.playerScore;
+    const previousCpuScore = this.match.cpuScore;
     this.match.update(deltaMilliseconds / 1000, playerTarget);
     this.playMatchSounds();
+    if (this.match.playerScore > previousPlayerScore) this.spawnGoalParticles(RINK.right);
+    if (this.match.cpuScore > previousCpuScore) this.spawnGoalParticles(RINK.left);
     this.render();
     if (this.match.status !== 'playing' && !this.resultShown) this.showResult();
+  }
+
+  private createGoalParticles(): void {
+    if (!this.textures.exists('hockey-goal-particle')) {
+      const square = this.make.graphics({ x: 0, y: 0 }, false);
+      square.fillStyle(0xffffff, 1);
+      square.fillRect(0, 0, 10, 10);
+      square.generateTexture('hockey-goal-particle', 10, 10);
+      square.destroy();
+    }
+    this.goalParticles = this.add.particles(0, 0, 'hockey-goal-particle', {
+      lifespan: 700,
+      speed: { min: 150, max: 420 },
+      angle: { min: 0, max: 360 },
+      scale: { start: 1, end: 0 },
+      rotate: { start: 0, end: 360 },
+      gravityY: 700,
+      tint: [0xffd166, 0x65d8ff, 0xff5f78, 0xffffff],
+      emitting: false,
+    }).setDepth(3);
+  }
+
+  private spawnGoalParticles(goalX: number): void {
+    this.goalParticles.explode(28, goalX, RINK.centerY);
   }
 
   private playMatchSounds(): void {
@@ -90,7 +120,22 @@ export class HockeyGameScene extends Phaser.Scene {
           ? HOCKEY_AUDIO.centerBoost
           : HOCKEY_AUDIO.puckHit;
       this.sound.play(audio.key, { volume: audio.volume });
+      if (event === 'puck-hit') this.spawnRipple(this.match.puck.x, this.match.puck.y);
     }
+  }
+
+  private spawnRipple(x: number, y: number): void {
+    const ripple = this.add.circle(x, y, RINK.puckRadius, 0xffffff, 0);
+    ripple.setStrokeStyle(2, 0xaee9ff, 0.7);
+    ripple.setDepth(2);
+    this.tweens.add({
+      targets: ripple,
+      scale: 3,
+      alpha: 0,
+      duration: 450,
+      ease: 'Sine.easeOut',
+      onComplete: () => ripple.destroy(),
+    });
   }
 
   private render(): void {
