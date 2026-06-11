@@ -15,10 +15,11 @@ describe('shared audio manifest', () => {
     expect(SHARED_AUDIO.defeat.url).toContain('defeat-jingle.wav');
   });
 
-  it('registers the three shared BGM roles with namespaced keys', () => {
-    expect(Object.keys(SHARED_BGM)).toEqual(['title', 'thoughtful', 'active']);
+  it('registers the four shared BGM roles with namespaced keys', () => {
+    expect(Object.keys(SHARED_BGM)).toEqual(['title', 'thoughtful', 'active', 'upbeat']);
     expect(SHARED_BGM.title.key).toBe('shared:bgm:title-selection');
     expect(SHARED_BGM.thoughtful.key).toBe('shared:bgm:thoughtful');
     expect(SHARED_BGM.active.key).toBe('shared:bgm:active');
+    expect(SHARED_BGM.upbeat.key).toBe('shared:bgm:upbeat');
   });
 });

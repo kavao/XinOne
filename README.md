@@ -1,7 +1,7 @@
 # XinOne
 
 Phaser 3 と Tauri 2 で作られた、複数ゲーム対応のデスクトップゲームランチャーです。
-現在は、難易度選択付きのマインスイーパーとSpot Hockeyを収録しています。
+現在は、難易度選択付きのマインスイーパー、Spot Hockey、Cosmic Breakoutを収録しています。
 
 ## 必要環境
 
@@ -38,6 +38,7 @@ npm run vite-dev
 - マインスイーパーは左クリックでセルを開き、右クリックで旗を切り替えます。
 - Spot Hockeyはマウス移動で左側の水色パドルを操作し、右側のCPUゴールを狙います。両パドルはゴール寄りのラインから開始し、中央スポットへパックを当てると2秒間だけ速度が倍になります。
 - Spot HockeyはCPU難易度を3段階から選べます。先に5点取ると勝利です。
+- Cosmic Breakoutはマウス移動でパドルを操作し、中央の正方形フィールドでブロックを崩します。全5ステージあり、4面ではアイテム（マルチボール・パドル拡大・貫通・レーザー）が出現します。
 - `Launcher` ボタンでランチャーへ戻ります。
 - `Fullscreen` または `Full` ボタンでフルスクリーンを切り替えます。
 
@@ -73,6 +74,7 @@ packages/game-contracts  ゲームが実装する共通契約
 packages/game-runtime    起動、終了、フルスクリーンなどの共通処理
 games/minesweeper        独立したマインスイーパーゲーム
 games/hockey             独立したマウス操作ホッケーゲーム
+games/breakout           独立したブロック崩しゲーム(全5ステージ)
 ```
 
 ゲーム追加手順は [docs/adding-a-game.md](docs/adding-a-game.md) を参照してください。

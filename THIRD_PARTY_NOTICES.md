@@ -9,11 +9,13 @@ The following sounds were synthesized specifically for this project without exte
 - `hockey:sfx:goal` - Synthetic Goal Chime
 - `hockey:sfx:puck-hit` - Synthetic Puck Hit
 - `hockey:sfx:center-boost` - Synthetic Center Boost
+- `breakout:sfx:ball-hit` - Synthetic Ball Hit
 - `shared:sfx:ui-click` - Synthetic UI Click
 - `shared:sfx:victory` - Synthetic Victory Jingle
 - `shared:sfx:defeat` - Synthetic Defeat Jingle
 - `shared:bgm:title-selection` - Synthetic Title Selection Loop
 - `shared:bgm:thoughtful` - Synthetic Thoughtful Loop
 - `shared:bgm:active` - Synthetic Active Loop
+- `shared:bgm:upbeat` - Synthetic Upbeat Loop
 
 Detailed provenance and SHA-256 hashes are stored under `licenses/audio/`.

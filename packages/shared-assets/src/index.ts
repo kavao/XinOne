@@ -34,6 +34,11 @@ export const SHARED_BGM = {
     url: new URL('../assets/audio/bgm/active.wav', import.meta.url).href,
     volume: 0.22,
   },
+  upbeat: {
+    key: 'shared:bgm:upbeat',
+    url: new URL('../assets/audio/bgm/upbeat.wav', import.meta.url).href,
+    volume: 0.2,
+  },
 } as const;
 
 export type SharedBgmTrack = keyof typeof SHARED_BGM;
