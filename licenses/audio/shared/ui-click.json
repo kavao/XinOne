@@ -1,0 +1,15 @@
+{
+  "assetId": "shared-sfx-ui-click",
+  "audioKey": "shared:sfx:ui-click",
+  "file": "packages/shared-assets/assets/audio/sfx/ui-click.wav",
+  "title": "Synthetic UI Click",
+  "creator": "XinOne project",
+  "sourceType": "project-generated",
+  "sourceUrl": null,
+  "license": "CC0-1.0",
+  "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "createdAt": "2026-06-12",
+  "sha256": "19D0B2E03E5764E2FA5BE6A073441ED0FE7D14CD18BBF35309A2781A87E187C3",
+  "generation": "Deterministic synthesized two-tone UI click at 44.1 kHz, mono, 16-bit PCM.",
+  "externalMaterials": []
+}

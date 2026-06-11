@@ -1,0 +1,12 @@
+{
+  "name": "@xinone/hockey",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": "./src/index.ts",
+  "dependencies": {
+    "@xinone/game-contracts": "*",
+    "@xinone/shared-assets": "*",
+    "phaser": "^3.90.0"
+  }
+}

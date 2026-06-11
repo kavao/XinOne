@@ -1,0 +1,15 @@
+{
+  "assetId": "shared-bgm-title-selection",
+  "audioKey": "shared:bgm:title-selection",
+  "file": "packages/shared-assets/assets/audio/bgm/title-selection.wav",
+  "title": "Synthetic Title Selection Loop",
+  "creator": "XinOne project",
+  "sourceType": "project-generated",
+  "sourceUrl": null,
+  "license": "CC0-1.0",
+  "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "createdAt": "2026-06-12",
+  "sha256": "160343D1045BF1022E86185E152EF1F1C614B2939E671B4B271F8EB46EB03D10",
+  "generation": "Deterministic synthesized title-selection loop at 22.05 kHz, mono, 16-bit PCM.",
+  "externalMaterials": []
+}

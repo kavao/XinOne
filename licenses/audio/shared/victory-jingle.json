@@ -1,0 +1,15 @@
+{
+  "assetId": "shared-sfx-victory",
+  "audioKey": "shared:sfx:victory",
+  "file": "packages/shared-assets/assets/audio/sfx/victory-jingle.wav",
+  "title": "Synthetic Victory Jingle",
+  "creator": "XinOne project",
+  "sourceType": "project-generated",
+  "sourceUrl": null,
+  "license": "CC0-1.0",
+  "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "createdAt": "2026-06-12",
+  "sha256": "01363ECA8E1D0FAA83719FB6B342EBC468D16FEF0BD166C46877F46E04B87630",
+  "generation": "Deterministic synthesized ascending victory jingle at 44.1 kHz, mono, 16-bit PCM.",
+  "externalMaterials": []
+}

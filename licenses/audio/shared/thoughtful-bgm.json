@@ -1,0 +1,15 @@
+{
+  "assetId": "shared-bgm-thoughtful",
+  "audioKey": "shared:bgm:thoughtful",
+  "file": "packages/shared-assets/assets/audio/bgm/thoughtful.wav",
+  "title": "Synthetic Thoughtful Loop",
+  "creator": "XinOne project",
+  "sourceType": "project-generated",
+  "sourceUrl": null,
+  "license": "CC0-1.0",
+  "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "createdAt": "2026-06-12",
+  "sha256": "BDC167C7DB6180456514891F333A418F13213691BB1D0AE78E98235067E7E8D8",
+  "generation": "Deterministic synthesized thoughtful loop at 22.05 kHz, mono, 16-bit PCM.",
+  "externalMaterials": []
+}

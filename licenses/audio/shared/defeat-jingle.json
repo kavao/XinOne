@@ -1,0 +1,15 @@
+{
+  "assetId": "shared-sfx-defeat",
+  "audioKey": "shared:sfx:defeat",
+  "file": "packages/shared-assets/assets/audio/sfx/defeat-jingle.wav",
+  "title": "Synthetic Defeat Jingle",
+  "creator": "XinOne project",
+  "sourceType": "project-generated",
+  "sourceUrl": null,
+  "license": "CC0-1.0",
+  "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "createdAt": "2026-06-12",
+  "sha256": "1938057B3CA7AA7881B49E962706E6345DBDE1B24013413424D6CBEEDA48524B",
+  "generation": "Deterministic synthesized descending defeat jingle at 44.1 kHz, mono, 16-bit PCM.",
+  "externalMaterials": []
+}

@@ -1,0 +1,15 @@
+{
+  "assetId": "hockey-sfx-center-boost",
+  "audioKey": "hockey:sfx:center-boost",
+  "file": "games/hockey/assets/audio/sfx/center-boost.wav",
+  "title": "Synthetic Center Boost",
+  "creator": "XinOne project",
+  "sourceType": "project-generated",
+  "sourceUrl": null,
+  "license": "CC0-1.0",
+  "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "createdAt": "2026-06-12",
+  "sha256": "EAB5A751A48B557D1C682564DB3844129A391961A83F45D89A596760C217F5F3",
+  "generation": "Deterministic synthesized rising boost tone at 44.1 kHz, mono, 16-bit PCM.",
+  "externalMaterials": []
+}

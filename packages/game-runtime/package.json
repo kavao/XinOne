@@ -1,0 +1,11 @@
+{
+  "name": "@xinone/game-runtime",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": "./src/index.ts",
+  "dependencies": {
+    "@xinone/game-contracts": "*",
+    "phaser": "^3.90.0"
+  }
+}

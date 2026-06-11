@@ -1,0 +1,15 @@
+{
+  "assetId": "hockey-sfx-puck-hit",
+  "audioKey": "hockey:sfx:puck-hit",
+  "file": "games/hockey/assets/audio/sfx/puck-hit.wav",
+  "title": "Synthetic Puck Hit",
+  "creator": "XinOne project",
+  "sourceType": "project-generated",
+  "sourceUrl": null,
+  "license": "CC0-1.0",
+  "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "createdAt": "2026-06-12",
+  "sha256": "C3738636391052D54BC1CE01182DE57056B8780C4CC7B43EEB71F2D427450149",
+  "generation": "Deterministic synthesized impact tone and noise at 44.1 kHz, mono, 16-bit PCM.",
+  "externalMaterials": []
+}

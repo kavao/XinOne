@@ -1,0 +1,15 @@
+{
+  "assetId": "shared-bgm-active",
+  "audioKey": "shared:bgm:active",
+  "file": "packages/shared-assets/assets/audio/bgm/active.wav",
+  "title": "Synthetic Active Loop",
+  "creator": "XinOne project",
+  "sourceType": "project-generated",
+  "sourceUrl": null,
+  "license": "CC0-1.0",
+  "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "createdAt": "2026-06-12",
+  "sha256": "5F57B6ECA521A6E370A34E4A44095BAE5D8DF6C3B17148522CF1CEFD533E7DBA",
+  "generation": "Deterministic synthesized active loop at 22.05 kHz, mono, 16-bit PCM.",
+  "externalMaterials": []
+}

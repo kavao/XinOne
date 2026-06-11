@@ -1,0 +1,19 @@
+{
+  "name": "xinone",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "workspaces": ["apps/*", "packages/*", "games/*"],
+  "scripts": {
+    "dev": "npm run dev --workspace @xinone/desktop",
+    "vite-dev": "npm run vite-dev --workspace @xinone/desktop",
+    "build": "npm run build --workspace @xinone/desktop",
+    "vite-build": "npm run vite-build --workspace @xinone/desktop",
+    "test": "vitest run",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "devDependencies": {
+    "typescript": "~5.6.2",
+    "vitest": "^3.2.4"
+  }
+}

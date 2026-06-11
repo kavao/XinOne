@@ -1,0 +1,62 @@
+import { playClickSound, playSharedBgm, preloadSharedAudio } from '@xinone/shared-assets';
+import Phaser from 'phaser';
+import { gameDefinitions } from '../registry';
+import { getRuntime } from '../runtime-context';
+
+export const LAUNCHER_SCENE = 'app:launcher';
+
+export class LauncherScene extends Phaser.Scene {
+  constructor() {
+    super(LAUNCHER_SCENE);
+  }
+
+  preload(): void {
+    preloadSharedAudio(this);
+  }
+
+  create(): void {
+    playSharedBgm(this, 'title');
+    this.cameras.main.setBackgroundColor(0x08111f);
+    this.add.text(70, 60, 'XinOne', {
+      fontFamily: 'Arial Black',
+      fontSize: '64px',
+      color: '#f8fafc',
+    });
+    this.add.text(74, 132, 'One launcher. Many small worlds.', {
+      fontFamily: 'Arial',
+      fontSize: '24px',
+      color: '#91a4bd',
+    });
+
+    gameDefinitions.forEach((definition, index) => {
+      const x = 70 + (index % 3) * 390;
+      const y = 230 + Math.floor(index / 3) * 250;
+      const card = this.add.rectangle(x, y, 350, 205, 0x14243a)
+        .setOrigin(0).setStrokeStyle(3, definition.accentColor).setInteractive();
+      this.add.text(x + 25, y + 28, definition.title, {
+        fontFamily: 'Arial Black', fontSize: '32px', color: '#ffffff',
+      });
+      this.add.text(x + 25, y + 82, definition.description, {
+        fontFamily: 'Arial', fontSize: '19px', color: '#b8c7db', wordWrap: { width: 300 },
+      });
+      this.add.text(x + 25, y + 160, 'PLAY', {
+        fontFamily: 'Arial Black', fontSize: '20px', color: '#65d8ff',
+      });
+      card.on('pointerover', () => card.setFillStyle(0x1d3553));
+      card.on('pointerout', () => card.setFillStyle(0x14243a));
+      card.on('pointerdown', () => {
+        playClickSound(this);
+        getRuntime().launch(definition);
+      });
+    });
+
+    const fullscreen = this.add.text(1175, 665, 'FULLSCREEN', {
+      fontFamily: 'Arial', fontSize: '18px', color: '#b8c7db',
+      backgroundColor: '#14243a', padding: { x: 18, y: 12 },
+    }).setOrigin(1, 0.5).setInteractive();
+    fullscreen.on('pointerdown', () => {
+      playClickSound(this);
+      void getRuntime().toggleFullscreen();
+    });
+  }
+}
