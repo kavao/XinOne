@@ -9,7 +9,7 @@
   "license": "CC0-1.0",
   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
   "createdAt": "2026-06-12",
-  "sha256": "1938057B3CA7AA7881B49E962706E6345DBDE1B24013413424D6CBEEDA48524B",
-  "generation": "Deterministic synthesized descending defeat jingle at 44.1 kHz, mono, 16-bit PCM.",
+  "sha256": "21C649F9A25F632509A8144B8C82B3C136EBB9E8401CFD371A0992BD6AF81882",
+  "generation": "uv run python tools/sound/sfx_generator.py --input-file scores/shared-defeat-jingle.mml --style sawtooth --filter lowpass --cutoff 2200 --attack 0.01 --decay 0.05 --sustain 0.4 --release 0.15 --volume 0.85 -o packages/shared-assets/assets/audio/sfx/defeat-jingle",
   "externalMaterials": []
 }

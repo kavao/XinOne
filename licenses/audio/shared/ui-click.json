@@ -9,7 +9,7 @@
   "license": "CC0-1.0",
   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
   "createdAt": "2026-06-12",
-  "sha256": "19D0B2E03E5764E2FA5BE6A073441ED0FE7D14CD18BBF35309A2781A87E187C3",
-  "generation": "Deterministic synthesized two-tone UI click at 44.1 kHz, mono, 16-bit PCM.",
+  "sha256": "7755B63F2BF4EF06EA54D69CC582C828BD41BE88D0E62C561928642EF353979F",
+  "generation": "uv run python tools/sound/sfx_generator.py --input-file scores/shared-ui-click.mml --style sine --attack 0.001 --decay 0.025 --sustain 0.25 --release 0.035 --volume 1.0 -o packages/shared-assets/assets/audio/sfx/ui-click",
   "externalMaterials": []
 }

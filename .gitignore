@@ -25,6 +25,9 @@ __pycache__/
 .pytest_cache/
 *.egg-info/
 
+# ===== 音源生成 (OnGen) の検証出力 =====
+/output/
+
 # ===== Node.js =====
 node_modules/
 dist/

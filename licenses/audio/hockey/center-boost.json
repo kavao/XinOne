@@ -9,7 +9,7 @@
   "license": "CC0-1.0",
   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
   "createdAt": "2026-06-12",
-  "sha256": "EAB5A751A48B557D1C682564DB3844129A391961A83F45D89A596760C217F5F3",
-  "generation": "Deterministic synthesized rising boost tone at 44.1 kHz, mono, 16-bit PCM.",
+  "sha256": "C3DB30EFD9AC65669D17E4B1021421D02612F61AFE6BA244D33767DB6DE5667D",
+  "generation": "uv run python tools/sound/sfx_generator.py --input-file scores/hockey-center-boost.mml --style square --duty 0.25 --attack 0.002 --decay 0.03 --sustain 0.65 --release 0.05 --volume 0.85 -o games/hockey/assets/audio/sfx/center-boost",
   "externalMaterials": []
 }

@@ -9,7 +9,7 @@
   "license": "CC0-1.0",
   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
   "createdAt": "2026-06-12",
-  "sha256": "3C6D71B9859471B89438EF4DF298172B9ACE99604882BA22F23A870B67F028B8",
-  "generation": "Deterministic synthesized C-major chime at 44.1 kHz, mono, 16-bit PCM.",
+  "sha256": "C5079E713886B30D5E605C2A0625417C14C2A4F68D3D0D4622805DA3F185DAB9",
+  "generation": "uv run python tools/sound/sfx_generator.py --input-file scores/hockey-goal.mml --style sine --fm --fm-ratio 2.0 --fm-index 1.2 --attack 0.002 --decay 0.08 --sustain 0.25 --release 0.1 --volume 0.85 -o games/hockey/assets/audio/sfx/goal",
   "externalMaterials": []
 }

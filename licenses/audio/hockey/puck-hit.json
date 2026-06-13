@@ -9,7 +9,7 @@
   "license": "CC0-1.0",
   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
   "createdAt": "2026-06-12",
-  "sha256": "C3738636391052D54BC1CE01182DE57056B8780C4CC7B43EEB71F2D427450149",
-  "generation": "Deterministic synthesized impact tone and noise at 44.1 kHz, mono, 16-bit PCM.",
+  "sha256": "8C509DB1AC09D43C16C4E0C17CFED38EEA484843D80EE6089B256B9C3E65C7A3",
+  "generation": "uv run python tools/sound/sfx_generator.py --input-file scores/hockey-puck-hit.mml --style noise --noise-color pink --filter highpass --cutoff 700 --attack 0.001 --decay 0.08 --sustain 0 --release 0.03 --volume 1.0 -o games/hockey/assets/audio/sfx/puck-hit",
   "externalMaterials": []
 }

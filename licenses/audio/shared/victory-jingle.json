@@ -9,7 +9,7 @@
   "license": "CC0-1.0",
   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
   "createdAt": "2026-06-12",
-  "sha256": "01363ECA8E1D0FAA83719FB6B342EBC468D16FEF0BD166C46877F46E04B87630",
-  "generation": "Deterministic synthesized ascending victory jingle at 44.1 kHz, mono, 16-bit PCM.",
+  "sha256": "20D6B4FBA9D691DB91B6F92A46C8A9C014DC853802D25DF25C62E9502C972CF0",
+  "generation": "uv run python tools/sound/sfx_generator.py --input-file scores/shared-victory-jingle.mml --style square --duty 0.25 --attack 0.004 --decay 0.06 --sustain 0.55 --release 0.1 --volume 0.85 -o packages/shared-assets/assets/audio/sfx/victory-jingle",
   "externalMaterials": []
 }

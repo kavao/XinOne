@@ -9,7 +9,7 @@
   "license": "CC0-1.0",
   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
   "createdAt": "2026-06-12",
-  "sha256": "160343D1045BF1022E86185E152EF1F1C614B2939E671B4B271F8EB46EB03D10",
-  "generation": "Deterministic synthesized title-selection loop at 22.05 kHz, mono, 16-bit PCM.",
+  "sha256": "12A132740654BEC46248ECD60BD2C56DC1F71A24842669008A89E1AFA092978B",
+  "generation": "uv run python tools/sound/sfx_generator.py --input-file scores/shared-title-selection-bgm.mml --style square --duty 0.5 --track-file scores/shared-title-selection-bgm-bass.mml --track-style triangle --attack 0.005 --decay 0.05 --sustain 0.65 --release 0.05 --volume 0.85 -o output/bgm/title-selection (44.1 kHz); then resample to 22.05 kHz mono 16-bit PCM via scipy.signal.resample_poly(audio, up=1, down=2) and scale peak to ~0.82.",
   "externalMaterials": []
 }
