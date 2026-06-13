@@ -42,6 +42,11 @@ jobs:
       - name: Build web frontend
         run: npm run vite-build
 
+      - name: Build web frontend for GitHub Pages
+        run: npm run vite-build
+        env:
+          VITE_BASE_PATH: /${{ github.event.repository.name }}/
+
   python:
     name: Python and OnGen tests
     runs-on: ubuntu-latest

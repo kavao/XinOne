@@ -66,6 +66,16 @@ npm run build
 Windows のインストーラーなどは、ビルド成功後に
 `apps/desktop/src-tauri/target/release/bundle/` 以下へ生成されます。
 
+## GitHub Pages（Web 版）
+
+Web フロントエンドは GitHub Pages で公開できます。Tauri 版と同じゲーム内容をブラウザでプレイできます。
+
+- 公開 URL: `https://kavao.github.io/XinOne/`
+- `main` への push で [Deploy GitHub Pages](.github/workflows/pages.yml) ワークフローが自動デプロイします。
+- 初回のみ、GitHub リポジトリの **Settings → Pages → Source** を **GitHub Actions** に設定してください。
+
+詳細は [docs/github-pages.md](docs/github-pages.md) を参照してください。
+
 ## 構成
 
 ```text

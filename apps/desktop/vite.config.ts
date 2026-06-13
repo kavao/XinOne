@@ -2,10 +2,12 @@ import { defineConfig } from "vite";
 
 // @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
+const base = process.env.VITE_BASE_PATH ?? "/";
 
 // https://vitejs.dev/config/
 export default defineConfig(async () => ({
 
+    base,
     // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
     //
     // 1. prevent vite from obscuring rust errors
