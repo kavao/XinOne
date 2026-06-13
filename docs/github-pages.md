@@ -12,8 +12,27 @@
 
 1. GitHub リポジトリの **Settings** → **Pages** を開きます。
 2. **Build and deployment** の **Source** を **GitHub Actions** に設定します。
-3. `main` ブランチへ push すると [Deploy GitHub Pages](https://github.com/kavao/XinOne/actions/workflows/pages.yml) ワークフローが実行されます。
+3. 設定を保存したあと、`main` ブランチへ push するか、Actions タブから **Deploy GitHub Pages** を **Re-run all jobs** で再実行します。
 4. デプロイ完了後、**Settings** → **Pages** に表示される URL をブラウザで開きます。
+
+> **注意**: Pages の Source を GitHub Actions に切り替える**前**に workflow が走ると、デプロイ job が 404 で失敗します（ビルドは成功します）。設定後に workflow を再実行してください。
+
+## デプロイが 404 で失敗したとき
+
+[Actions の Deploy ジョブ](https://github.com/kavao/XinOne/actions) で次のエラーが出る場合:
+
+```text
+Failed to create deployment (status: 404)
+Ensure GitHub Pages has been enabled
+```
+
+次を確認してください。
+
+1. **Settings → Pages → Source** が **GitHub Actions** になっている（Branch ではない）。
+2. 設定変更**後**に workflow を再実行している（設定前の失敗 run をそのままにしない）。
+3. リポジトリが Public である（Private リポジトリは Pages 利用に制限があります）。
+
+確認後、Actions タブで失敗した **Deploy GitHub Pages** run を開き、右上の **Re-run all jobs** をクリックします。
 
 ## 自動デプロイの流れ
 
