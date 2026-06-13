@@ -6,7 +6,16 @@
 
 リポジトリ `kavao/XinOne` の場合、次の URL で公開されます。
 
-`https://kavao.github.io/XinOne/`
+[https://kavao.github.io/XinOne/](https://kavao.github.io/XinOne/)
+
+## リポジトリから Web 版へ誘導する
+
+README 冒頭と GitHub Pages 節に Web 版 URL へのリンクを置いています。加えて、GitHub リポジトリ画面上からも次の設定ができます。
+
+1. リポジトリトップ右上の **About** の歯車（⚙）を開く。
+2. **Website** に `https://kavao.github.io/XinOne/` を入力して保存する。
+
+About 横にリンクアイコンが表示され、README を開かなくても Web 版へ移動できます。
 
 ## 初回設定（リポジトリ管理者）
 

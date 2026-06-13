@@ -3,6 +3,8 @@
 Phaser 3 と Tauri 2 で作られた、複数ゲーム対応のデスクトップゲームランチャーです。
 現在は、難易度選択付きのマインスイーパー、Spot Hockey、Cosmic Breakoutを収録しています。
 
+**Web 版（ブラウザでプレイ）**: [https://kavao.github.io/XinOne/](https://kavao.github.io/XinOne/)
+
 ## 必要環境
 
 - Node.js 20 以降
@@ -70,7 +72,7 @@ Windows のインストーラーなどは、ビルド成功後に
 
 Web フロントエンドは GitHub Pages で公開できます。Tauri 版と同じゲーム内容をブラウザでプレイできます。
 
-- 公開 URL: `https://kavao.github.io/XinOne/`
+- 公開 URL: [https://kavao.github.io/XinOne/](https://kavao.github.io/XinOne/)
 - `main` への push で [Deploy GitHub Pages](.github/workflows/pages.yml) ワークフローが自動デプロイします。
 - 初回のみ、GitHub リポジトリの **Settings → Pages → Source** を **GitHub Actions** に設定してください。
 - 設定後に workflow が 404 で失敗した場合は、Actions から **Re-run all jobs** で再実行してください。
