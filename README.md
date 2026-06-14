@@ -7,6 +7,32 @@ Phaser 3 と Tauri 2 で作られた、複数ゲーム対応のデスクトッ�
 
 **Windows 版（デスクトップ）**: [Releases からダウンロード](https://github.com/kavao/XinOne/releases/latest)
 
+## スクリーンショット
+
+### ランチャー
+
+![XinOne ランチャー — 3つのゲームから選んでプレイ](images/shot04.webp)
+
+星空を背景に、収録ゲームをカードから選んで起動します。
+
+### マインスイーパー
+
+![マインスイーパー — Beginner 難易度のプレイ画面](images/shot02.webp)
+
+左クリックでセルを開き、右クリックで旗を立てて地雷原をクリアします。
+
+### Spot Hockey
+
+![Spot Hockey — CPU 対戦のプレイ画面](images/shot01.webp)
+
+マウスでパドルを操作し、中央スポットでパックを加速させながら5点先取で勝利を目指します。
+
+### Cosmic Breakout
+
+![Cosmic Breakout — Stage 1 Liftoff のプレイ画面](images/shot03.webp)
+
+全5ステージのブロックを崩し、ステージごとの宇宙船イラストとアイテムが登場します。
+
 ## 必要環境
 
 - Node.js 20 以降
