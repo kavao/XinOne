@@ -5,6 +5,8 @@ Phaser 3 と Tauri 2 で作られた、複数ゲーム対応のデスクトッ�
 
 **Web 版（ブラウザでプレイ）**: [https://kavao.github.io/XinOne/](https://kavao.github.io/XinOne/)
 
+**Windows 版（デスクトップ）**: [Releases からダウンロード](https://github.com/kavao/XinOne/releases/latest)
+
 ## 必要環境
 
 - Node.js 20 以降
@@ -79,6 +81,15 @@ Web フロントエンドは GitHub Pages で公開できます。Tauri 版と�
 - 設定後に workflow が 404 で失敗した場合は、Actions から **Re-run all jobs** で再実行してください。
 
 詳細は [docs/github-pages.md](docs/github-pages.md) を参照してください。
+
+## GitHub Releases（Windows 版）
+
+Windows 向けインストーラー（`.exe` / `.msi`）は GitHub Releases で配布します。
+
+- ダウンロード: [Releases（最新版）](https://github.com/kavao/XinOne/releases/latest)
+- `v*` タグを push するか、Actions から [Release Windows](.github/workflows/release-windows.yml) ワークフローを手動実行するとビルド・公開されます。
+
+詳細は [docs/github-release.md](docs/github-release.md) を参照してください。
 
 ## 構成
 
