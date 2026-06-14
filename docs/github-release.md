@@ -8,10 +8,11 @@
 
 [Releases（最新版）](https://github.com/kavao/XinOne/releases/latest)
 
-配布物は次の2種類です。
+配布物は次の3種類です。
 
 - **`XinOne_<version>_x64-setup.exe`** — 一般向けインストーラー（NSIS）
 - **`XinOne_<version>_x64_en-US.msi`** — MSI インストーラー
+- **`xinone.exe`** — ポータブル実行ファイル（インストール不要。WebView2 等が PC に入っている前提）
 
 ## 初回設定（リポジトリ管理者）
 
@@ -61,7 +62,7 @@ flowchart LR
   tag[v* タグ push または手動実行] --> ci[Release Windows workflow]
   ci --> test[テストと型検査]
   test --> build[Windows で tauri build]
-  build --> release[GitHub Releases に .exe / .msi を添付]
+  build --> release[GitHub Releases に .exe / .msi / xinone.exe を添付]
   release --> url[releases/latest]
 ```
 
@@ -76,10 +77,14 @@ CI を使わず手元でビルドする場合は、リポジトリルートで�
 npm run build
 ```
 
-成功すると `apps/desktop/src-tauri/target/release/bundle/` 以下に `.exe` と `.msi` が生成されます。
+成功すると次が生成されます。
+
+- `apps/desktop/src-tauri/target/release/bundle/` — インストーラー（`.exe` / `.msi`）
+- `apps/desktop/src-tauri/target/release/xinone.exe` — ポータブル実行ファイル
 
 ## 注意事項
 
 - Release ワークフローは **Windows 向けのみ** ビルドします。Web 版の公開は [GitHub Pages 公開](github-pages.md) を参照してください。
+- **`xinone.exe`（ポータブル版）** は WebView2 と Visual C++ 再頒布可能パッケージが PC に入っている前提です。初めての PC や確実に動かしたい場合は NSIS インストーラーを使ってください。
 - `main` への通常 push では Release は作成されません。`v*` タグ push または Actions からの手動実行でのみ起動します。
 - タグ名（例: `v0.1.0`）と `tauri.conf.json` の `version`（例: `0.1.0`）は対応させてください。

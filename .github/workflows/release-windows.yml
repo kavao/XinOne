@@ -67,9 +67,11 @@ jobs:
 
             - **XinOne___VERSION___x64-setup.exe** — 一般向けインストーラー（NSIS）
             - **XinOne___VERSION___x64_en-US.msi** — MSI インストーラー
+            - **xinone.exe** — ポータブル実行ファイル（WebView2 等が PC に入っている前提）
 
             Web 版は [GitHub Pages](https://kavao.github.io/XinOne/) からプレイできます。
           releaseDraft: ${{ github.event_name == 'workflow_dispatch' && inputs.draft }}
           prerelease: false
           includeUpdaterJson: false
+          uploadPlainBinary: true
           generateReleaseNotes: true
