@@ -39,7 +39,9 @@ export class DifficultyScene extends Phaser.Scene {
     });
 
     addButton(this, 500, 590, 'Back to launcher', () => this.runtime.returnToLauncher(), 260);
-    addButton(this, 780, 590, 'Fullscreen', () => void this.runtime.toggleFullscreen(), 220);
+    if (this.runtime.canToggleFullscreen()) {
+      addButton(this, 780, 590, 'Fullscreen', () => void this.runtime.toggleFullscreen(), 220);
+    }
   }
 
   private labelFor(difficulty: Difficulty): string {

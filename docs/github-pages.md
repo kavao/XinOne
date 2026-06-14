@@ -81,5 +81,5 @@ npx vite preview
 ## 注意事項
 
 - GitHub Pages で公開されるのは **Web フロントエンドのみ** です。Tauri デスクトップ版の配布は別途 `npm run build` で行います。
-- フルスクリーンはブラウザの Fullscreen API を使用します（Tauri 版とは実装が異なります）。
+- Web 版にはフルスクリーンボタンを表示しません。ブラウザ自体の表示切り替え機能を使用してください。
 - リポジトリ名を変更した場合、`VITE_BASE_PATH` は workflow 内でリポジトリ名から自動設定されるため、workflow の修正は不要です。

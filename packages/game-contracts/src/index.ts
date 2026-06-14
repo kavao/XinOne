@@ -2,6 +2,9 @@ import type Phaser from 'phaser';
 
 export interface RuntimeActions {
   returnToLauncher(): void;
+  togglePause(): boolean;
+  isPaused(): boolean;
+  canToggleFullscreen(): boolean;
   toggleFullscreen(): Promise<void>;
 }
 

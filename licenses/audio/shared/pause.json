@@ -1,0 +1,15 @@
+{
+  "assetId": "shared-sfx-pause",
+  "audioKey": "shared:sfx:pause",
+  "file": "packages/shared-assets/assets/audio/sfx/pause.wav",
+  "title": "Synthetic Pause Chime",
+  "creator": "XinOne project",
+  "sourceType": "project-generated",
+  "sourceUrl": null,
+  "license": "CC0-1.0",
+  "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "createdAt": "2026-06-14",
+  "sha256": "65389C3F00EE8109A9A2908D696A731D1ED27978285BF4BE76A96F2B7FB9EF74",
+  "generation": "uv run python tools/sound/sfx_generator.py --input-file scores/shared-pause.mml --style sine --attack 0.002 --decay 0.04 --sustain 0.35 --release 0.08 --volume 0.9 -o packages/shared-assets/assets/audio/sfx/pause",
+  "externalMaterials": []
+}

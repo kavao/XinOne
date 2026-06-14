@@ -16,6 +16,11 @@ export const SHARED_AUDIO = {
     url: new URL('../assets/audio/sfx/defeat-jingle.wav', import.meta.url).href,
     volume: 0.58,
   },
+  pause: {
+    key: 'shared:sfx:pause',
+    url: new URL('../assets/audio/sfx/pause.wav', import.meta.url).href,
+    volume: 0.5,
+  },
 } as const;
 
 export const SHARED_BGM = {
@@ -60,6 +65,19 @@ export function playClickSound(scene: Phaser.Scene): void {
 export function playOutcomeSound(scene: Phaser.Scene, outcome: 'victory' | 'defeat'): void {
   const audio = SHARED_AUDIO[outcome];
   if (scene.cache.audio.exists(audio.key)) scene.sound.play(audio.key, { volume: audio.volume });
+}
+
+export function playPauseSound(scene: Phaser.Scene): void {
+  const audio = SHARED_AUDIO.pause;
+  if (scene.cache.audio.exists(audio.key)) scene.sound.play(audio.key, { volume: audio.volume });
+}
+
+export function pauseSharedBgm(): void {
+  if (activeBgm?.isPlaying) activeBgm.pause();
+}
+
+export function resumeSharedBgm(): void {
+  if (activeBgm?.isPaused) activeBgm.resume();
 }
 
 export function playSharedBgm(scene: Phaser.Scene, track: SharedBgmTrack): void {

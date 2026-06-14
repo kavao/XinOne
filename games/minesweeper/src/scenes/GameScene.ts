@@ -53,7 +53,9 @@ export class MinesweeperGameScene extends Phaser.Scene {
     addButton(this, 1030, 56, 'Restart', () => this.scene.restart({ runtime: this.runtime, difficulty: this.difficulty }), 150);
     addButton(this, 1180, 56, 'Menu', () => this.scene.start(MINESWEEPER_DIFFICULTY_SCENE, { runtime: this.runtime }), 120);
     addButton(this, 1070, 675, 'Launcher', () => this.runtime.returnToLauncher(), 170);
-    addButton(this, 1200, 675, 'Full', () => void this.runtime.toggleFullscreen(), 100);
+    if (this.runtime.canToggleFullscreen()) {
+      addButton(this, 1200, 675, 'Full', () => void this.runtime.toggleFullscreen(), 100);
+    }
 
     this.boardContainer = this.add.container(0, 0);
     this.createExplosionParticles();
@@ -62,7 +64,7 @@ export class MinesweeperGameScene extends Phaser.Scene {
 
   update(): void {
     if (this.startedAt && this.board.status === 'playing') {
-      this.timerText.setText(`Time: ${Math.floor((Date.now() - this.startedAt) / 1000)}`);
+      this.timerText.setText(`Time: ${Math.floor((this.time.now - this.startedAt) / 1000)}`);
     }
   }
 
@@ -144,7 +146,7 @@ export class MinesweeperGameScene extends Phaser.Scene {
       const previousStatus = this.board.status;
       if (pointer.rightButtonDown()) this.board.toggleFlag(cell.x, cell.y);
       else {
-        if (!this.startedAt) this.startedAt = Date.now();
+        if (!this.startedAt) this.startedAt = this.time.now;
         this.board.reveal(cell.x, cell.y);
       }
       if (previousStatus !== 'won' && previousStatus !== 'lost') {

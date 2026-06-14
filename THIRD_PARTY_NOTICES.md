@@ -24,6 +24,7 @@ The following sounds were synthesized specifically for this project without exte
 - `shared:sfx:ui-click` - Synthetic UI Click
 - `shared:sfx:victory` - Synthetic Victory Jingle
 - `shared:sfx:defeat` - Synthetic Defeat Jingle
+- `shared:sfx:pause` - Synthetic Pause Chime
 - `shared:bgm:title-selection` - Synthetic Title Selection Loop
 - `shared:bgm:thoughtful` - Synthetic Thoughtful Loop
 - `shared:bgm:active` - Synthetic Active Loop

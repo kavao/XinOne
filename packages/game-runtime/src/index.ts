@@ -10,33 +10,51 @@ export interface FullscreenAdapter {
 
 export class GameRuntime implements RuntimeActions {
   private activeGame?: GameDefinition;
+  private paused = false;
 
   constructor(
     private readonly game: Phaser.Game,
     private readonly launcherSceneKey: string,
+    private readonly overlaySceneKey: string,
     private readonly fullscreenAdapter?: FullscreenAdapter,
   ) {}
 
   launch(definition: GameDefinition): void {
     this.stopActiveGame();
     this.activeGame = definition;
+    this.paused = false;
     this.game.scene.stop(this.launcherSceneKey);
     this.game.scene.start(definition.startScene, { runtime: this });
+    this.game.scene.start(this.overlaySceneKey, { runtime: this });
   }
 
   returnToLauncher(): void {
     this.stopActiveGame();
+    this.game.scene.stop(this.overlaySceneKey);
     this.game.scene.start(this.launcherSceneKey);
   }
 
-  async toggleFullscreen(): Promise<void> {
-    if (this.fullscreenAdapter) {
-      await this.fullscreenAdapter.toggle();
-    } else if (this.game.scale.isFullscreen) {
-      this.game.scale.stopFullscreen();
-    } else {
-      this.game.scale.startFullscreen();
+  togglePause(): boolean {
+    if (!this.activeGame) return false;
+    this.paused = !this.paused;
+    for (const SceneClass of this.activeGame.scenes) {
+      const key = new SceneClass().sys.settings.key;
+      if (this.paused && this.game.scene.isActive(key)) this.game.scene.pause(key);
+      else if (!this.paused && this.game.scene.isPaused(key)) this.game.scene.resume(key);
     }
+    return this.paused;
+  }
+
+  isPaused(): boolean {
+    return this.paused;
+  }
+
+  canToggleFullscreen(): boolean {
+    return this.fullscreenAdapter !== undefined;
+  }
+
+  async toggleFullscreen(): Promise<void> {
+    await this.fullscreenAdapter?.toggle();
   }
 
   private stopActiveGame(): void {
@@ -45,5 +63,6 @@ export class GameRuntime implements RuntimeActions {
       this.game.scene.stop(new SceneClass().sys.settings.key);
     }
     this.activeGame = undefined;
+    this.paused = false;
   }
 }

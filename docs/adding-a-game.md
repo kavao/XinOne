@@ -41,7 +41,9 @@ export const exampleDefinition: GameDefinition = {
 ゲーム開始時のシーンデータには `runtime` が渡されます。
 
 - `runtime.returnToLauncher()` でゲームを終了してランチャーへ戻る
-- `runtime.toggleFullscreen()` でフルスクリーンを切り替える
+- 共通ポーズOverlayはランタイムが自動表示するため、ゲーム側でポーズボタンを追加する必要はありません
+- `runtime.canToggleFullscreen()` が `true` の場合だけフルスクリーンボタンを表示する
+- 表示したフルスクリーンボタンから `runtime.toggleFullscreen()` を呼び出す
 
 ゲームから Tauri API やランチャー内部を直接呼び出さないでください。
 

@@ -108,6 +108,7 @@ export class LauncherScene extends Phaser.Scene {
   }
 
   private createFullscreenButton(): void {
+    if (!getRuntime().canToggleFullscreen()) return;
     const fullscreen = this.add.text(1175, 665, 'FULLSCREEN', {
       fontFamily: 'Arial', fontSize: '18px', color: '#b8c7db',
       backgroundColor: '#14243a', padding: { x: 18, y: 12 },

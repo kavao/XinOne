@@ -44,6 +44,8 @@ export class HockeyDifficultyScene extends Phaser.Scene {
     });
 
     addHockeyButton(this, 500, 600, 'Back to launcher', () => this.runtime.returnToLauncher(), 260);
-    addHockeyButton(this, 780, 600, 'Fullscreen', () => void this.runtime.toggleFullscreen(), 220);
+    if (this.runtime.canToggleFullscreen()) {
+      addHockeyButton(this, 780, 600, 'Fullscreen', () => void this.runtime.toggleFullscreen(), 220);
+    }
   }
 }

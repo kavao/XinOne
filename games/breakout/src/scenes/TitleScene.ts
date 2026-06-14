@@ -41,6 +41,8 @@ export class BreakoutTitleScene extends Phaser.Scene {
     }, 260);
 
     addBreakoutButton(this, 500, 600, 'Back to launcher', () => this.runtime.returnToLauncher(), 260);
-    addBreakoutButton(this, 780, 600, 'Fullscreen', () => void this.runtime.toggleFullscreen(), 220);
+    if (this.runtime.canToggleFullscreen()) {
+      addBreakoutButton(this, 780, 600, 'Fullscreen', () => void this.runtime.toggleFullscreen(), 220);
+    }
   }
 }

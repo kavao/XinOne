@@ -13,6 +13,8 @@ describe('shared audio manifest', () => {
     expect(SHARED_AUDIO.victory.url).toContain('victory-jingle.wav');
     expect(SHARED_AUDIO.defeat.key).toBe('shared:sfx:defeat');
     expect(SHARED_AUDIO.defeat.url).toContain('defeat-jingle.wav');
+    expect(SHARED_AUDIO.pause.key).toBe('shared:sfx:pause');
+    expect(SHARED_AUDIO.pause.url).toContain('pause.wav');
   });
 
   it('registers the four shared BGM roles with namespaced keys', () => {
