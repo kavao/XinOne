@@ -31,11 +31,13 @@ export const RINK = {
   goalHalfHeight: 120,
   paddleRadius: 43,
   puckRadius: 21,
+  paddleWallClearance: 46,
   spotRadius: 38,
   winningScore: 5,
   basePuckSpeed: 430,
   maxPuckSpeed: 1700,
   boostDuration: 2,
+  puckHitEventCooldown: 0.08,
 } as const;
 
 export interface HockeySnapshot {
@@ -62,6 +64,7 @@ export class HockeyMatch {
   boostRemaining = 0;
   private spotContact = true;
   private preBoostSpeed: number = RINK.basePuckSpeed;
+  private puckHitEventCooldown = 0;
   private events: HockeyEvent[] = [];
 
   constructor(readonly difficulty: CpuDifficulty) {}
@@ -70,16 +73,26 @@ export class HockeyMatch {
     if (this.status !== 'playing') return;
     const delta = Math.min(deltaSeconds, 1 / 30);
     const previousPlayer = { ...this.player };
+    const previousCpu = { ...this.cpu };
     this.updateBoostTimer(deltaSeconds);
+    this.puckHitEventCooldown = Math.max(0, this.puckHitEventCooldown - deltaSeconds);
 
-    this.player.x = clamp(pointer.x, RINK.left + RINK.paddleRadius, RINK.centerX - RINK.paddleRadius);
-    this.player.y = clamp(pointer.y, RINK.top + RINK.paddleRadius, RINK.bottom - RINK.paddleRadius);
+    this.player.x = clamp(
+      pointer.x,
+      RINK.left + RINK.paddleRadius + RINK.paddleWallClearance,
+      RINK.centerX - RINK.paddleRadius,
+    );
+    this.player.y = clamp(
+      pointer.y,
+      RINK.top + RINK.paddleRadius + RINK.paddleWallClearance,
+      RINK.bottom - RINK.paddleRadius - RINK.paddleWallClearance,
+    );
     this.updateCpu(delta);
 
     this.puck.x += this.puckVelocity.x * delta;
     this.puck.y += this.puckVelocity.y * delta;
     this.collideWithPaddle(this.player, previousPlayer, delta);
-    this.collideWithPaddle(this.cpu);
+    this.collideWithPaddle(this.cpu, previousCpu, delta);
     this.collideWithWallsAndGoals();
     this.applyCenterSpotBoost();
     this.boostFlash = Math.max(0, this.boostFlash - delta);
@@ -120,8 +133,16 @@ export class HockeyMatch {
       ? this.puck.y
       : RINK.centerY + (this.puck.y - RINK.centerY) * this.difficulty.homeBias;
     moveToward(this.cpu, {
-      x: clamp(defendX, RINK.centerX + RINK.paddleRadius, RINK.right - RINK.paddleRadius),
-      y: clamp(defendY, RINK.top + RINK.paddleRadius, RINK.bottom - RINK.paddleRadius),
+      x: clamp(
+        defendX,
+        RINK.centerX + RINK.paddleRadius,
+        RINK.right - RINK.paddleRadius - RINK.paddleWallClearance,
+      ),
+      y: clamp(
+        defendY,
+        RINK.top + RINK.paddleRadius + RINK.paddleWallClearance,
+        RINK.bottom - RINK.paddleRadius - RINK.paddleWallClearance,
+      ),
     }, this.difficulty.maxSpeed * delta);
   }
 
@@ -137,13 +158,18 @@ export class HockeyMatch {
     this.puck.x = paddle.x + normalX * minimumDistance;
     this.puck.y = paddle.y + normalY * minimumDistance;
 
-    const speed = Math.max(RINK.basePuckSpeed, Math.hypot(this.puckVelocity.x, this.puckVelocity.y) * 1.04);
     const paddleVelocityX = previous ? (paddle.x - previous.x) / delta : 0;
     const paddleVelocityY = previous ? (paddle.y - previous.y) / delta : 0;
+    const relativeNormalVelocity = (this.puckVelocity.x - paddleVelocityX) * normalX
+      + (this.puckVelocity.y - paddleVelocityY) * normalY;
+    if (relativeNormalVelocity >= 0) return;
+
+    const speed = Math.max(RINK.basePuckSpeed, Math.hypot(this.puckVelocity.x, this.puckVelocity.y) * 1.04);
     const influenceX = normalX * speed + paddleVelocityX * 0.25;
     const influenceY = normalY * speed + paddleVelocityY * 0.25;
     this.setPuckSpeed(influenceX, influenceY, Math.min(RINK.maxPuckSpeed, Math.hypot(influenceX, influenceY)));
-    this.events.push('puck-hit');
+    this.applyWallEscapeBias();
+    this.emitPuckHit();
   }
 
   private collideWithWallsAndGoals(): void {
@@ -173,7 +199,7 @@ export class HockeyMatch {
       this.puckVelocity.y = -Math.abs(this.puckVelocity.y);
       wallBounced = true;
     }
-    if (wallBounced) this.events.push('puck-hit');
+    if (wallBounced) this.emitPuckHit();
   }
 
   private applyCenterSpotBoost(): void {
@@ -216,6 +242,7 @@ export class HockeyMatch {
     this.puckVelocity.y = RINK.basePuckSpeed * 0.25 * direction;
     this.boostRemaining = 0;
     this.preBoostSpeed = RINK.basePuckSpeed;
+    this.puckHitEventCooldown = 0;
     this.spotContact = true;
   }
 
@@ -240,6 +267,38 @@ export class HockeyMatch {
     const length = Math.hypot(x, y) || 1;
     this.puckVelocity.x = (x / length) * targetSpeed;
     this.puckVelocity.y = (y / length) * targetSpeed;
+  }
+
+  private applyWallEscapeBias(): void {
+    const speed = Math.hypot(this.puckVelocity.x, this.puckVelocity.y);
+    const minimumTangentSpeed = speed * 0.25;
+    const nearLeftWall = this.puck.x - RINK.puckRadius < RINK.left + RINK.paddleWallClearance;
+    const nearRightWall = this.puck.x + RINK.puckRadius > RINK.right - RINK.paddleWallClearance;
+    const nearTopWall = this.puck.y - RINK.puckRadius < RINK.top + RINK.paddleWallClearance;
+    const nearBottomWall = this.puck.y + RINK.puckRadius > RINK.bottom - RINK.paddleWallClearance;
+
+    if ((nearLeftWall && this.puckVelocity.x < 0) || (nearRightWall && this.puckVelocity.x > 0)) {
+      const escapeY = this.puck.y < RINK.centerY ? 1 : -1;
+      this.setPuckSpeed(
+        this.puckVelocity.x,
+        escapeY * Math.max(Math.abs(this.puckVelocity.y), minimumTangentSpeed),
+        speed,
+      );
+    }
+    if ((nearTopWall && this.puckVelocity.y < 0) || (nearBottomWall && this.puckVelocity.y > 0)) {
+      const escapeX = this.puck.x < RINK.centerX ? 1 : -1;
+      this.setPuckSpeed(
+        escapeX * Math.max(Math.abs(this.puckVelocity.x), minimumTangentSpeed),
+        this.puckVelocity.y,
+        speed,
+      );
+    }
+  }
+
+  private emitPuckHit(): void {
+    if (this.puckHitEventCooldown > 0) return;
+    this.events.push('puck-hit');
+    this.puckHitEventCooldown = RINK.puckHitEventCooldown;
   }
 }
 

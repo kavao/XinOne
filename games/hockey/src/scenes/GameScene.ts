@@ -10,6 +10,8 @@ interface HockeyGameData extends GameSceneData {
   difficulty: CpuDifficulty;
 }
 
+const MAX_ACTIVE_RIPPLES = 12;
+
 export class HockeyGameScene extends Phaser.Scene {
   private runtime!: RuntimeActions;
   private difficulty!: CpuDifficulty;
@@ -20,6 +22,7 @@ export class HockeyGameScene extends Phaser.Scene {
   private playerLabel?: Phaser.GameObjects.Text;
   private cpuLabel?: Phaser.GameObjects.Text;
   private goalParticles!: Phaser.GameObjects.Particles.ParticleEmitter;
+  private activeRipples = new Set<Phaser.GameObjects.Arc>();
   private playerHasMoved = false;
   private resultShown = false;
 
@@ -31,6 +34,7 @@ export class HockeyGameScene extends Phaser.Scene {
     this.runtime = data.runtime;
     this.difficulty = data.difficulty;
     this.match = new HockeyMatch(data.difficulty);
+    this.activeRipples.clear();
     this.playerHasMoved = false;
     this.resultShown = false;
   }
@@ -125,7 +129,9 @@ export class HockeyGameScene extends Phaser.Scene {
   }
 
   private spawnRipple(x: number, y: number): void {
+    if (this.activeRipples.size >= MAX_ACTIVE_RIPPLES) return;
     const ripple = this.add.circle(x, y, RINK.puckRadius, 0xffffff, 0);
+    this.activeRipples.add(ripple);
     ripple.setStrokeStyle(2, 0xaee9ff, 0.7);
     ripple.setDepth(2);
     this.tweens.add({
@@ -134,7 +140,10 @@ export class HockeyGameScene extends Phaser.Scene {
       alpha: 0,
       duration: 450,
       ease: 'Sine.easeOut',
-      onComplete: () => ripple.destroy(),
+      onComplete: () => {
+        this.activeRipples.delete(ripple);
+        ripple.destroy();
+      },
     });
   }
 

@@ -6,8 +6,8 @@ describe('HockeyMatch', () => {
     const match = new HockeyMatch(CPU_DIFFICULTIES[1]);
     match.update(1 / 60, { x: -100, y: -100 });
 
-    expect(match.player.x).toBe(RINK.left + RINK.paddleRadius);
-    expect(match.player.y).toBe(RINK.top + RINK.paddleRadius);
+    expect(match.player.x).toBe(RINK.left + RINK.paddleRadius + RINK.paddleWallClearance);
+    expect(match.player.y).toBe(RINK.top + RINK.paddleRadius + RINK.paddleWallClearance);
   });
 
   it('starts both paddles on their goal-side lines', () => {
@@ -102,6 +102,61 @@ describe('HockeyMatch', () => {
 
     expect(match.puckVelocity.x).toBeGreaterThan(0);
     expect(match.consumeEvents()).toContain('puck-hit');
+  });
+
+  it('leaves enough room for the puck between paddles and physical walls', () => {
+    const match = new HockeyMatch(CPU_DIFFICULTIES[1]);
+    match.update(1, { x: -100, y: 1000 });
+    for (let frame = 0; frame < 60; frame += 1) {
+      match.puck.x = RINK.right - 100;
+      match.puck.y = RINK.bottom - 1;
+      match.puckVelocity.x = 0;
+      match.puckVelocity.y = 0;
+      match.update(1 / 60, match.player);
+    }
+
+    expect(match.player.x - RINK.paddleRadius - RINK.left).toBeGreaterThanOrEqual(RINK.puckRadius * 2);
+    expect(RINK.bottom - match.player.y - RINK.paddleRadius).toBeGreaterThanOrEqual(RINK.puckRadius * 2);
+    expect(RINK.right - match.cpu.x - RINK.paddleRadius).toBeGreaterThanOrEqual(RINK.puckRadius * 2);
+    expect(RINK.bottom - match.cpu.y - RINK.paddleRadius).toBeGreaterThanOrEqual(RINK.puckRadius * 2);
+  });
+
+  it('does not emit a puck-hit event every frame for repeated contact', () => {
+    const match = new HockeyMatch(CPU_DIFFICULTIES[1]);
+    let hitEvents = 0;
+
+    for (let frame = 0; frame < 4; frame += 1) {
+      match.puck.x = match.player.x + RINK.paddleRadius + RINK.puckRadius - 2;
+      match.puck.y = match.player.y;
+      match.puckVelocity.x = -500;
+      match.puckVelocity.y = 0;
+      match.update(1 / 60, match.player);
+      hitEvents += match.consumeEvents().filter((event) => event === 'puck-hit').length;
+    }
+
+    expect(hitEvents).toBe(1);
+  });
+
+  it('lets a puck escape after a collision near the player-side wall', () => {
+    const match = new HockeyMatch(CPU_DIFFICULTIES[1]);
+    const wallTarget = { x: -100, y: RINK.top + 100 };
+    match.update(1 / 60, wallTarget);
+    match.consumeEvents();
+    match.puck.x = RINK.left + RINK.puckRadius;
+    match.puck.y = match.player.y;
+    match.puckVelocity.x = -RINK.basePuckSpeed;
+    match.puckVelocity.y = 0;
+
+    let hitEvents = 0;
+    let farthestPuckX = match.puck.x;
+    for (let frame = 0; frame < 120; frame += 1) {
+      match.update(1 / 60, wallTarget);
+      farthestPuckX = Math.max(farthestPuckX, match.puck.x);
+      hitEvents += match.consumeEvents().filter((event) => event === 'puck-hit').length;
+    }
+
+    expect(farthestPuckX).toBeGreaterThan(RINK.left + RINK.paddleRadius + RINK.puckRadius);
+    expect(hitEvents).toBeLessThan(10);
   });
 
   it('ends the match when the player reaches five goals', () => {
