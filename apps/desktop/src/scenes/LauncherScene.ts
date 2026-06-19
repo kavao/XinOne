@@ -1,9 +1,21 @@
+import type { GameResult } from '@xinone/game-contracts';
 import { playClickSound, playSharedBgm, preloadSharedAudio } from '@xinone/shared-assets';
 import Phaser from 'phaser';
 import { gameDefinitions } from '../registry';
 import { getRuntime } from '../runtime-context';
 
 export const LAUNCHER_SCENE = 'app:launcher';
+
+function formatScore(result: GameResult): string {
+  if (result.scoreType === 'time') {
+    const m = Math.floor(result.value / 60);
+    const s = result.value % 60;
+    return m > 0
+      ? `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+      : `${result.value}秒`;
+  }
+  return `${result.value}${result.unit}`;
+}
 
 export class LauncherScene extends Phaser.Scene {
   constructor() {
@@ -52,6 +64,7 @@ export class LauncherScene extends Phaser.Scene {
     });
 
     this.createFullscreenButton();
+    this.createResultsPanel();
   }
 
   private createSpaceBackground(): void {
@@ -105,6 +118,49 @@ export class LauncherScene extends Phaser.Scene {
       frequency: 180,
       quantity: 1,
     }).setDepth(-1);
+  }
+
+  private createResultsPanel(): void {
+    const results = getRuntime().getResults();
+    const recent = [...results].reverse().slice(0, 5);
+
+    this.add.text(70, 455, 'RECENT RESULTS', {
+      fontFamily: 'Arial Black',
+      fontSize: '15px',
+      color: '#91a4bd',
+    });
+
+    const divider = this.add.graphics();
+    divider.fillStyle(0x1d3553, 1);
+    divider.fillRect(70, 477, 1140, 1);
+
+    if (recent.length === 0) {
+      this.add.text(70, 490, 'No results yet — play a game!', {
+        fontFamily: 'Arial',
+        fontSize: '17px',
+        color: '#334a63',
+      });
+      return;
+    }
+
+    recent.forEach((result, i) => {
+      const y = 490 + i * 32;
+      const gameDef = gameDefinitions.find((d) => d.id === result.gameId);
+      const gameTitle = gameDef?.title ?? result.gameId;
+      const accentColor = gameDef
+        ? `#${gameDef.accentColor.toString(16).padStart(6, '0')}`
+        : '#ffffff';
+      const outcomeLabel = result.outcome === 'win' ? 'WIN' : 'LOSE';
+      const outcomeColor = result.outcome === 'win' ? '#4ade80' : '#fb7185';
+      const scoreLabel = formatScore(result);
+      const dt = new Date(result.playedAt);
+      const timeLabel = `${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`;
+
+      this.add.text(70, y, gameTitle, { fontFamily: 'Arial Black', fontSize: '18px', color: accentColor });
+      this.add.text(310, y, outcomeLabel, { fontFamily: 'Arial Black', fontSize: '18px', color: outcomeColor });
+      this.add.text(410, y, scoreLabel, { fontFamily: 'Arial Black', fontSize: '18px', color: '#f8fafc' });
+      this.add.text(570, y, timeLabel, { fontFamily: 'Arial', fontSize: '16px', color: '#91a4bd' });
+    });
   }
 
   private createFullscreenButton(): void {

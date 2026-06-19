@@ -35,6 +35,7 @@ export class SystemOverlayScene extends Phaser.Scene {
       padding: { x: 10, y: 12 },
     }).setOrigin(1, 0.5).setDepth(10000).setInteractive();
     this.pauseButton.on('pointerdown', () => this.togglePause());
+    this.input.keyboard?.on('keydown-ESC', () => this.togglePause());
   }
 
   update(): void {

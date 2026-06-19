@@ -11,12 +11,13 @@ export interface CpuDifficulty {
   label: string;
   maxSpeed: number;
   homeBias: number;
+  timeBonusMultiplier: number;
 }
 
 export const CPU_DIFFICULTIES: CpuDifficulty[] = [
-  { id: 'easy', label: 'Easy', maxSpeed: 260, homeBias: 0.58 },
-  { id: 'normal', label: 'Normal', maxSpeed: 390, homeBias: 0.38 },
-  { id: 'hard', label: 'Hard', maxSpeed: 540, homeBias: 0.18 },
+  { id: 'easy', label: 'Easy', maxSpeed: 260, homeBias: 0.58, timeBonusMultiplier: 1 },
+  { id: 'normal', label: 'Normal', maxSpeed: 390, homeBias: 0.38, timeBonusMultiplier: 2 },
+  { id: 'hard', label: 'Hard', maxSpeed: 540, homeBias: 0.18, timeBonusMultiplier: 3 },
 ];
 
 export const RINK = {
@@ -47,6 +48,7 @@ export interface HockeySnapshot {
   puckVelocity: Point;
   playerScore: number;
   cpuScore: number;
+  playerHits: number;
   status: HockeyStatus;
   boostFlash: number;
   boostRemaining: number;
@@ -59,6 +61,7 @@ export class HockeyMatch {
   readonly puckVelocity: Point = { x: -RINK.basePuckSpeed, y: RINK.basePuckSpeed * 0.25 };
   playerScore = 0;
   cpuScore = 0;
+  playerHits = 0;
   status: HockeyStatus = 'playing';
   boostFlash = 0;
   boostRemaining = 0;
@@ -91,7 +94,7 @@ export class HockeyMatch {
 
     this.puck.x += this.puckVelocity.x * delta;
     this.puck.y += this.puckVelocity.y * delta;
-    this.collideWithPaddle(this.player, previousPlayer, delta);
+    this.collideWithPaddle(this.player, previousPlayer, delta, true);
     this.collideWithPaddle(this.cpu, previousCpu, delta);
     this.collideWithWallsAndGoals();
     this.applyCenterSpotBoost();
@@ -106,6 +109,7 @@ export class HockeyMatch {
       puckVelocity: { ...this.puckVelocity },
       playerScore: this.playerScore,
       cpuScore: this.cpuScore,
+      playerHits: this.playerHits,
       status: this.status,
       boostFlash: this.boostFlash,
       boostRemaining: this.boostRemaining,
@@ -119,9 +123,15 @@ export class HockeyMatch {
   restart(): void {
     this.playerScore = 0;
     this.cpuScore = 0;
+    this.playerHits = 0;
     this.status = 'playing';
     this.events = [];
     this.resetPuck(1);
+  }
+
+  forceEnd(winner: 'player' | 'cpu'): void {
+    if (this.status !== 'playing') return;
+    this.status = winner === 'player' ? 'player-won' : 'cpu-won';
   }
 
   private updateCpu(delta: number): void {
@@ -146,7 +156,7 @@ export class HockeyMatch {
     }, this.difficulty.maxSpeed * delta);
   }
 
-  private collideWithPaddle(paddle: Point, previous?: Point, delta = 1): void {
+  private collideWithPaddle(paddle: Point, previous?: Point, delta = 1, isPlayer = false): void {
     const dx = this.puck.x - paddle.x;
     const dy = this.puck.y - paddle.y;
     const minimumDistance = RINK.paddleRadius + RINK.puckRadius;
@@ -169,6 +179,7 @@ export class HockeyMatch {
     const influenceY = normalY * speed + paddleVelocityY * 0.25;
     this.setPuckSpeed(influenceX, influenceY, Math.min(RINK.maxPuckSpeed, Math.hypot(influenceX, influenceY)));
     this.applyWallEscapeBias();
+    if (isPlayer && this.puckHitEventCooldown <= 0) this.playerHits += 1;
     this.emitPuckHit();
   }
 

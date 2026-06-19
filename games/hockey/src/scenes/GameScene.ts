@@ -11,6 +11,7 @@ interface HockeyGameData extends GameSceneData {
 }
 
 const MAX_ACTIVE_RIPPLES = 12;
+const MATCH_DURATION_MS = 120_000;
 
 export class HockeyGameScene extends Phaser.Scene {
   private runtime!: RuntimeActions;
@@ -23,6 +24,10 @@ export class HockeyGameScene extends Phaser.Scene {
   private cpuLabel?: Phaser.GameObjects.Text;
   private goalParticles!: Phaser.GameObjects.Particles.ParticleEmitter;
   private activeRipples = new Set<Phaser.GameObjects.Arc>();
+  private timerText!: Phaser.GameObjects.Text;
+  private playerScoreText!: Phaser.GameObjects.Text;
+  private matchStartTime = 0;
+  private timedOut = false;
   private playerHasMoved = false;
   private resultShown = false;
 
@@ -35,6 +40,8 @@ export class HockeyGameScene extends Phaser.Scene {
     this.difficulty = data.difficulty;
     this.match = new HockeyMatch(data.difficulty);
     this.activeRipples.clear();
+    this.matchStartTime = 0;
+    this.timedOut = false;
     this.playerHasMoved = false;
     this.resultShown = false;
   }
@@ -64,6 +71,17 @@ export class HockeyGameScene extends Phaser.Scene {
       fontSize: '18px',
       color: '#d7c6eb',
     }).setOrigin(1, 0);
+    this.timerText = this.add.text(640, 63, '2:00', {
+      fontFamily: 'Arial Black',
+      fontSize: '32px',
+      color: '#ffffff',
+    }).setOrigin(0.5, 0);
+    this.playerScoreText = this.add.text(105, 68, 'SCORE  0', {
+      fontFamily: 'Arial Black',
+      fontSize: '24px',
+      color: '#ffd166',
+    });
+    this.matchStartTime = this.time.now;
 
     addHockeyButton(this, 1050, 688, 'Menu', () => {
       this.scene.start(HOCKEY_DIFFICULTY_SCENE, { runtime: this.runtime });
@@ -84,10 +102,18 @@ export class HockeyGameScene extends Phaser.Scene {
       : { ...this.match.player };
     const previousPlayerScore = this.match.playerScore;
     const previousCpuScore = this.match.cpuScore;
+    const previousPlayerHits = this.match.playerHits;
     this.match.update(deltaMilliseconds / 1000, playerTarget);
     this.playMatchSounds();
-    if (this.match.playerScore > previousPlayerScore) this.spawnGoalParticles(RINK.right);
+    if (this.match.playerScore > previousPlayerScore) {
+      this.spawnGoalParticles(RINK.right);
+      this.showFloatingScore('+100', RINK.right - 80, RINK.centerY);
+    }
     if (this.match.cpuScore > previousCpuScore) this.spawnGoalParticles(RINK.left);
+    if (this.match.playerHits > previousPlayerHits) {
+      this.showFloatingScore('+10', this.match.puck.x, this.match.puck.y);
+    }
+    this.updateTimer();
     this.render();
     if (this.match.status !== 'playing' && !this.resultShown) this.showResult();
   }
@@ -185,6 +211,7 @@ export class HockeyGameScene extends Phaser.Scene {
     graphics.strokeCircle(snapshot.puck.x, snapshot.puck.y, RINK.puckRadius);
 
     this.scoreText.setText(`YOU  ${snapshot.playerScore}  -  ${snapshot.cpuScore}  CPU`);
+    this.playerScoreText.setText(`SCORE  ${snapshot.playerScore * 100 + snapshot.playerHits * 10}`);
     const boostText = snapshot.boostRemaining > 0 ? ` / BOOST ${snapshot.boostRemaining.toFixed(1)}s` : '';
     this.speedText.setText(`Puck speed: ${Math.round(Math.hypot(snapshot.puckVelocity.x, snapshot.puckVelocity.y))}${boostText}`);
     this.playerLabel?.setPosition(snapshot.player.x + RINK.paddleRadius + 14, snapshot.player.y - RINK.paddleRadius - 14);
@@ -229,18 +256,110 @@ export class HockeyGameScene extends Phaser.Scene {
   private showResult(): void {
     this.resultShown = true;
     const playerWon = this.match.status === 'player-won';
+    const elapsedMs = this.time.now - this.matchStartTime;
+    const remainingSeconds = playerWon
+      ? Math.max(0, Math.floor((MATCH_DURATION_MS - elapsedMs) / 1000))
+      : 0;
+    const goalPoints = this.match.playerScore * 100;
+    const hitPoints = this.match.playerHits * 10;
+    const mult = this.difficulty.timeBonusMultiplier;
+    const timeBonus = remainingSeconds * mult;
+    const totalScore = goalPoints + hitPoints + timeBonus;
+
     playOutcomeSound(this, playerWon ? 'victory' : 'defeat');
-    this.add.rectangle(640, 380, 580, 250, 0x090512, 0.94).setStrokeStyle(4, playerWon ? 0x65d8ff : 0xff5f78);
-    this.add.text(640, 315, playerWon ? 'YOU WIN!' : 'CPU WINS', {
-      fontFamily: 'Arial Black',
-      fontSize: '48px',
+    this.runtime.recordResult({
+      gameId: 'hockey',
+      scoreType: 'score',
+      value: totalScore,
+      unit: '点',
+      winCondition: 'higher',
+      outcome: playerWon ? 'win' : 'lose',
+      playedAt: new Date().toISOString(),
+    });
+
+    const panelH = playerWon ? (this.timedOut ? 390 : 360) : (this.timedOut ? 350 : 320);
+    const panelCY = 375;
+    this.add.rectangle(640, panelCY, 660, panelH, 0x090512, 0.95)
+      .setStrokeStyle(4, playerWon ? 0x65d8ff : 0xff5f78);
+
+    const panelTop = panelCY - panelH / 2;
+    this.add.text(640, panelTop + 52, playerWon ? 'YOU WIN!' : 'CPU WINS', {
+      fontFamily: 'Arial Black', fontSize: '44px',
       color: playerWon ? '#65d8ff' : '#ff5f78',
     }).setOrigin(0.5);
-    addHockeyButton(this, 520, 420, 'Play again', () => {
-      this.scene.restart({ runtime: this.runtime, difficulty: this.difficulty });
-    }, 200);
-    addHockeyButton(this, 760, 420, 'Difficulty', () => {
-      this.scene.start(HOCKEY_DIFFICULTY_SCENE, { runtime: this.runtime });
-    }, 200);
+
+    if (this.timedOut) {
+      this.add.text(640, panelTop + 98, '— TIME UP —', {
+        fontFamily: 'Arial', fontSize: '17px', color: '#91a4bd',
+      }).setOrigin(0.5);
+    }
+
+    const tallyRows: { label: string; calc: string; pts: number }[] = [
+      { label: 'ゴール', calc: `${this.match.playerScore} × 100`, pts: goalPoints },
+      { label: 'ヒット', calc: `${this.match.playerHits} × 10`, pts: hitPoints },
+    ];
+    if (playerWon) tallyRows.push({ label: 'タイム', calc: `${remainingSeconds}秒 × ${mult}`, pts: timeBonus });
+
+    const rowY0 = panelTop + (this.timedOut ? 130 : 112);
+    tallyRows.forEach((row, i) => {
+      this.time.delayedCall(300 + i * 500, () => {
+        const y = rowY0 + i * 40;
+        this.add.text(328, y, row.label, { fontFamily: 'Arial Black', fontSize: '18px', color: '#91a4bd' }).setOrigin(0, 0.5);
+        this.add.text(572, y, row.calc, { fontFamily: 'Arial', fontSize: '18px', color: '#b8c7db' }).setOrigin(0.5, 0.5);
+        this.add.text(952, y, `${row.pts}点`, { fontFamily: 'Arial Black', fontSize: '18px', color: '#f8fafc' }).setOrigin(1, 0.5);
+      });
+    });
+
+    const afterRowsDelay = 300 + (tallyRows.length - 1) * 500 + 600;
+    const dividerY = rowY0 + tallyRows.length * 40 + 4;
+    const totalLineY = dividerY + 26;
+    const buttonY = panelCY + panelH / 2 - 44;
+
+    this.time.delayedCall(afterRowsDelay, () => {
+      const g = this.add.graphics();
+      g.fillStyle(0x91a4bd, 0.35);
+      g.fillRect(318, dividerY, 644, 1);
+      this.add.text(328, totalLineY, 'TOTAL', { fontFamily: 'Arial Black', fontSize: '24px', color: '#ffd166' }).setOrigin(0, 0.5);
+      this.add.text(952, totalLineY, `${totalScore}点`, { fontFamily: 'Arial Black', fontSize: '28px', color: '#ffd166' }).setOrigin(1, 0.5);
+    });
+
+    this.time.delayedCall(afterRowsDelay + 500, () => {
+      addHockeyButton(this, 520, buttonY, 'Play again', () => {
+        this.scene.restart({ runtime: this.runtime, difficulty: this.difficulty });
+      }, 200);
+      addHockeyButton(this, 760, buttonY, 'Difficulty', () => {
+        this.scene.start(HOCKEY_DIFFICULTY_SCENE, { runtime: this.runtime });
+      }, 200);
+    });
+  }
+
+  private updateTimer(): void {
+    if (this.match.status !== 'playing') return;
+    const remaining = Math.max(0, MATCH_DURATION_MS - (this.time.now - this.matchStartTime));
+    const totalSecs = Math.ceil(remaining / 1000);
+    const m = Math.floor(totalSecs / 60);
+    const s = totalSecs % 60;
+    this.timerText.setText(`${m}:${String(s).padStart(2, '0')}`);
+    this.timerText.setColor(totalSecs <= 10 ? '#ff5f78' : '#ffffff');
+    if (remaining <= 0 && !this.resultShown) {
+      this.timedOut = true;
+      this.match.forceEnd(this.match.playerScore > this.match.cpuScore ? 'player' : 'cpu');
+    }
+  }
+
+  private showFloatingScore(text: string, x: number, y: number): void {
+    const label = this.add.text(x, y, text, {
+      fontFamily: 'Arial Black',
+      fontSize: '24px',
+      color: '#ffd166',
+    }).setOrigin(0.5).setDepth(10);
+    this.tweens.add({
+      targets: label,
+      y: y - 65,
+      alpha: 0,
+      duration: 850,
+      ease: 'Cubic.easeOut',
+      onComplete: () => label.destroy(),
+    });
   }
 }

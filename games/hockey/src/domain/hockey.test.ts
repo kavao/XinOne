@@ -159,6 +159,43 @@ describe('HockeyMatch', () => {
     expect(hitEvents).toBeLessThan(10);
   });
 
+  it('forceEnd sets the winner and ignores subsequent calls', () => {
+    const match = new HockeyMatch(CPU_DIFFICULTIES[1]);
+
+    expect(match.status).toBe('playing');
+    match.forceEnd('player');
+    expect(match.status).toBe('player-won');
+
+    match.forceEnd('cpu'); // no-op once decided
+    expect(match.status).toBe('player-won');
+  });
+
+  it('counts player hits but not cpu hits', () => {
+    const match = new HockeyMatch(CPU_DIFFICULTIES[1]);
+    match.puck.x = match.player.x + RINK.paddleRadius + RINK.puckRadius - 2;
+    match.puck.y = match.player.y;
+    match.puckVelocity.x = -500;
+    match.puckVelocity.y = 0;
+
+    match.update(1 / 60, match.player);
+
+    expect(match.playerHits).toBe(1);
+    expect(match.snapshot().playerHits).toBe(1);
+  });
+
+  it('resets playerHits on restart', () => {
+    const match = new HockeyMatch(CPU_DIFFICULTIES[1]);
+    match.puck.x = match.player.x + RINK.paddleRadius + RINK.puckRadius - 2;
+    match.puck.y = match.player.y;
+    match.puckVelocity.x = -500;
+    match.puckVelocity.y = 0;
+    match.update(1 / 60, match.player);
+    expect(match.playerHits).toBe(1);
+
+    match.restart();
+    expect(match.playerHits).toBe(0);
+  });
+
   it('ends the match when the player reaches five goals', () => {
     const match = new HockeyMatch(CPU_DIFFICULTIES[1]);
     for (let goal = 0; goal < RINK.winningScore; goal += 1) {

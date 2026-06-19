@@ -1,4 +1,4 @@
-import type { GameDefinition, RuntimeActions } from '@xinone/game-contracts';
+import type { GameDefinition, GameResult, RuntimeActions } from '@xinone/game-contracts';
 import type Phaser from 'phaser';
 
 export const BASE_WIDTH = 1280;
@@ -11,6 +11,7 @@ export interface FullscreenAdapter {
 export class GameRuntime implements RuntimeActions {
   private activeGame?: GameDefinition;
   private paused = false;
+  private results: GameResult[] = [];
 
   constructor(
     private readonly game: Phaser.Game,
@@ -55,6 +56,14 @@ export class GameRuntime implements RuntimeActions {
 
   async toggleFullscreen(): Promise<void> {
     await this.fullscreenAdapter?.toggle();
+  }
+
+  recordResult(result: GameResult): void {
+    this.results.push(result);
+  }
+
+  getResults(): readonly GameResult[] {
+    return this.results;
   }
 
   private stopActiveGame(): void {

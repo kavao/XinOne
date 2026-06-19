@@ -285,6 +285,15 @@ export class BreakoutGameScene extends Phaser.Scene {
 
     if (this.match.status === 'game-clear') {
       playOutcomeSound(this, 'victory');
+      this.runtime.recordResult({
+        gameId: 'breakout',
+        scoreType: 'score',
+        value: STAGE_COUNT,
+        unit: 'ステージ',
+        winCondition: 'higher',
+        outcome: 'win',
+        playedAt: new Date().toISOString(),
+      });
       this.add.rectangle(640, 360, 620, 460, 0x090512, 0.94).setStrokeStyle(4, 0xffd166);
       this.add.text(640, 220, 'GAME CLEAR!', {
         fontFamily: 'Arial Black',
@@ -300,6 +309,15 @@ export class BreakoutGameScene extends Phaser.Scene {
     }
 
     playOutcomeSound(this, 'defeat');
+    this.runtime.recordResult({
+      gameId: 'breakout',
+      scoreType: 'score',
+      value: this.stageNumber,
+      unit: 'ステージ',
+      winCondition: 'higher',
+      outcome: 'lose',
+      playedAt: new Date().toISOString(),
+    });
     this.add.rectangle(640, 360, 520, 220, 0x090512, 0.94).setStrokeStyle(4, 0xff5f4d);
     this.add.text(640, 300, 'GAME OVER', {
       fontFamily: 'Arial Black',

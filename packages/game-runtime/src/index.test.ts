@@ -1,4 +1,4 @@
-import type { GameDefinition, GameScene } from '@xinone/game-contracts';
+import type { GameDefinition, GameResult, GameScene } from '@xinone/game-contracts';
 import { describe, expect, it, vi } from 'vitest';
 import { GameRuntime } from './index';
 
@@ -50,6 +50,29 @@ describe('GameRuntime', () => {
 
     expect(runtime.canToggleFullscreen()).toBe(false);
     await expect(runtime.toggleFullscreen()).resolves.toBeUndefined();
+  });
+
+  it('records results and returns them in insertion order', () => {
+    const runtime = new GameRuntime({ scene: {} } as never, 'app:launcher', 'app:overlay');
+    const result: GameResult = {
+      gameId: 'hockey',
+      scoreType: 'score',
+      value: 3,
+      unit: '点',
+      winCondition: 'higher',
+      outcome: 'win',
+      playedAt: '2026-06-19T05:30:00.000Z',
+    };
+
+    expect(runtime.getResults()).toHaveLength(0);
+    runtime.recordResult(result);
+    expect(runtime.getResults()).toHaveLength(1);
+    expect(runtime.getResults()[0]).toEqual(result);
+
+    const result2: GameResult = { ...result, gameId: 'minesweeper', value: 45 };
+    runtime.recordResult(result2);
+    expect(runtime.getResults()).toHaveLength(2);
+    expect(runtime.getResults()[1].gameId).toBe('minesweeper');
   });
 
   it('pauses and resumes every active scene owned by the launched game', () => {

@@ -1,11 +1,24 @@
 import type Phaser from 'phaser';
 
+export type ScoreType = 'score' | 'time' | 'distance' | 'count' | 'survival' | 'weight';
+
+export interface GameResult {
+  gameId: string;
+  scoreType: ScoreType;
+  value: number;
+  unit: string;
+  winCondition: 'higher' | 'lower';
+  outcome: 'win' | 'lose';
+  playedAt: string; // ISO 8601
+}
+
 export interface RuntimeActions {
   returnToLauncher(): void;
   togglePause(): boolean;
   isPaused(): boolean;
   canToggleFullscreen(): boolean;
   toggleFullscreen(): Promise<void>;
+  recordResult(result: GameResult): void;
 }
 
 export interface GameSceneData {

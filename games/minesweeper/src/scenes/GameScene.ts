@@ -150,9 +150,28 @@ export class MinesweeperGameScene extends Phaser.Scene {
         this.board.reveal(cell.x, cell.y);
       }
       if (previousStatus !== 'won' && previousStatus !== 'lost') {
-        if (this.board.status === 'won') playOutcomeSound(this, 'victory');
-        else if (this.board.status === 'lost') {
+        if (this.board.status === 'won') {
+          playOutcomeSound(this, 'victory');
+          this.runtime.recordResult({
+            gameId: 'minesweeper',
+            scoreType: 'time',
+            value: this.startedAt ? Math.floor((this.time.now - this.startedAt) / 1000) : 0,
+            unit: '秒',
+            winCondition: 'lower',
+            outcome: 'win',
+            playedAt: new Date().toISOString(),
+          });
+        } else if (this.board.status === 'lost') {
           playOutcomeSound(this, 'defeat');
+          this.runtime.recordResult({
+            gameId: 'minesweeper',
+            scoreType: 'time',
+            value: this.startedAt ? Math.floor((this.time.now - this.startedAt) / 1000) : 0,
+            unit: '秒',
+            winCondition: 'lower',
+            outcome: 'lose',
+            playedAt: new Date().toISOString(),
+          });
           this.explosionParticles.explode(40, x + size / 2, y + size / 2);
           this.spawnExplosionRings(x + size / 2, y + size / 2, size);
         }
