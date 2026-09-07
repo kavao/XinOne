@@ -2,6 +2,7 @@ import { validateGameDefinitions, type GameDefinition } from '@xinone/game-contr
 import { breakoutDefinition } from '@xinone/breakout';
 import { hockeyDefinition } from '@xinone/hockey';
 import { minesweeperDefinition } from '@xinone/minesweeper';
+import { mechaShooterDefinition } from '@xinone/mecha-shooter';
 
-export const gameDefinitions: GameDefinition[] = [minesweeperDefinition, hockeyDefinition, breakoutDefinition];
+export const gameDefinitions: GameDefinition[] = [minesweeperDefinition, hockeyDefinition, breakoutDefinition, mechaShooterDefinition];
 validateGameDefinitions(gameDefinitions);

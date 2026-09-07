@@ -18,6 +18,7 @@
     "@xinone/game-runtime": "*",
     "@xinone/hockey": "*",
     "@xinone/minesweeper": "*",
+    "@xinone/mecha-shooter": "*",
     "@xinone/shared-assets": "*",
     "phaser": "^3.90.0"
   },

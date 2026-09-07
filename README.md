@@ -129,3 +129,5 @@ games/breakout           独立したブロック崩しゲーム(全5ステー�
 ```
 
 ゲーム追加手順は [docs/adding-a-game.md](docs/adding-a-game.md) を参照してください。
+
+次期ゲームの作業計画は [_workingspace/plan/mecha-scroll-shooter-plan.md](_workingspace/plan/mecha-scroll-shooter-plan.md) を参照してください。
