@@ -1,3 +1,6 @@
+import { createStage2BossState, drillHitsPlayer, stage2ShotImpact, updateStage2Boss, type Stage2BossState } from './stage2-boss';
+import { createDiverState, createStage3BossState, updateDiver, updateStage3Boss, type DiverState, type Stage3BossState } from './stage3';
+
 export const FIELD = { left: 300, right: 980, top: 0, bottom: 720 } as const;
 export const PLAYER = { width: 30, height: 42, speed: 0.22 } as const;
 export const PLAYER_HITBOX = { width: 14, height: 20 } as const;
@@ -7,12 +10,12 @@ export const BOMB_DURATION = 0.5;
 export const BOMB_RADIUS = 288;
 
 export type ShooterStatus = 'playing' | 'clear' | 'game-over';
-export type EnemyKind = 'scout' | 'striker' | 'guard' | 'turret' | 'armor' | 'splitter' | 'boss';
+export type EnemyKind = 'scout' | 'striker' | 'guard' | 'turret' | 'armor' | 'splitter' | 'diver' | 'boss';
 export type PowerUpKind = 'POWER' | 'WIDE' | 'SHIELD' | 'BOMB';
 
 export interface Point { x: number; y: number }
-export interface Bullet extends Point { vx: number; vy: number; radius: number; fromPlayer: boolean; damage: number; decorative?: boolean }
-export interface Enemy extends Point { kind: EnemyKind; width: number; height: number; hp: number; maxHp: number; phase: number; resourceKind?: PowerUpKind; noAttack?: boolean; lifeTimer?: number; attackCooldown?: number; attackTelegraph?: number; damageCooldown?: number; dashCooldown?: number; dashState?: 'telegraph' | 'dash' | 'returning'; dashTimer?: number; dashTargetX?: number }
+export interface Bullet extends Point { vx: number; vy: number; radius: number; fromPlayer: boolean; damage: number; decorative?: boolean; kind?: 'drill' | 'suppressive' | 'citadel' | 'wall'; age?: number }
+export interface Enemy extends Point { kind: EnemyKind; width: number; height: number; hp: number; maxHp: number; phase: number; resourceKind?: PowerUpKind; noAttack?: boolean; lifeTimer?: number; attackCooldown?: number; attackTelegraph?: number; damageCooldown?: number; dashCooldown?: number; dashState?: 'telegraph' | 'dash' | 'returning'; dashTimer?: number; dashTargetX?: number; stage2Boss?: Stage2BossState; stage3Boss?: Stage3BossState; diver?: DiverState }
 export interface PowerUp extends Point { kind: PowerUpKind; vy: number }
 export interface ShooterSnapshot {
   player: Point;
@@ -31,7 +34,7 @@ export interface ShooterSnapshot {
   shield: boolean;
 }
 
-export type ShooterEvent = 'player-hit' | 'enemy-destroyed' | 'boss-warning' | 'boss-arrived' | 'clear' | 'game-over' | 'bomb-used';
+export type ShooterEvent = 'player-hit' | 'enemy-destroyed' | 'boss-warning' | 'boss-arrived' | 'boss-phase-changed' | 'clear' | 'game-over' | 'bomb-used';
 
 export interface DestroyedEnemy extends Point {
   kind: EnemyKind;
@@ -83,7 +86,7 @@ export class MechaShooterMatch {
     this.spawnTimer -= delta;
     this.bossAttackTimer -= delta;
 
-    if (!this.bossSpawned && this.elapsed >= 24) {
+    if (!this.bossSpawned && this.elapsed >= (this.stage === 3 ? 30 : 24)) {
       this.bossSpawned = true;
       this.bossIntroSeconds = 2.5;
       this.events.push('boss-warning');
@@ -91,16 +94,20 @@ export class MechaShooterMatch {
     if (this.bossSpawned && this.bossIntroSeconds > 0) {
       this.bossIntroSeconds = Math.max(0, this.bossIntroSeconds - delta);
       if (this.bossIntroSeconds <= 0) {
-        const bossHp = this.stage === 2 ? 170 : 120;
-        this.enemies.push({ x: 640, y: 120, kind: 'boss', width: 150, height: 90, hp: bossHp, maxHp: bossHp, phase: 0 });
+        const bossHp = this.stage === 3 ? 360 : this.stage === 2 ? 170 : 120;
+        if (this.stage === 3) {
+          this.enemies = [];
+          this.bullets = this.bullets.filter((bullet) => bullet.fromPlayer);
+        }
+        this.enemies.push({ x: 640, y: 120, kind: 'boss', width: 150, height: 90, hp: bossHp, maxHp: bossHp, phase: 0, ...(this.stage === 2 ? { stage2Boss: createStage2BossState() } : this.stage === 3 ? { stage3Boss: createStage3BossState() } : {}) });
         this.events.push('boss-arrived');
       }
     } else if (!this.bossSpawned && this.spawnTimer <= 0) {
-      this.spawnTimer = 1.8;
+      this.spawnTimer = this.stage === 3 ? 1.6 : 1.8;
       this.spawnWave();
     }
 
-    for (const bullet of this.bullets) { bullet.x += bullet.vx * delta; bullet.y += bullet.vy * delta; }
+    for (const bullet of this.bullets) { bullet.x += bullet.vx * delta; bullet.y += bullet.vy * delta; if (bullet.kind === 'drill') bullet.age = (bullet.age ?? 0) + delta; }
     for (const powerUp of this.powerUps) powerUp.y += powerUp.vy * delta;
     for (const powerUp of this.powerUps) {
       if (hit({ x: this.player.x, y: this.player.y }, { x: powerUp.x, y: powerUp.y, width: 34, height: 34 })) {
@@ -110,6 +117,7 @@ export class MechaShooterMatch {
     }
     this.powerUps = this.powerUps.filter((powerUp) => powerUp.y < FIELD.bottom + 30);
     for (const enemy of this.enemies) {
+      const movement = this.stage === 3 ? 1.2 : 1;
       enemy.phase += delta;
       enemy.damageCooldown = Math.max(0, (enemy.damageCooldown ?? 0) - delta);
       enemy.dashCooldown = Math.max(0, (enemy.dashCooldown ?? 0) - delta);
@@ -117,8 +125,8 @@ export class MechaShooterMatch {
       enemy.attackTelegraph = Math.max(0, (enemy.attackTelegraph ?? 0) - delta);
       if (enemy.kind === 'scout') {
         // 高速推進しながら蛇行し、主人公の軌道付近へ寄ってくる偵察機。
-        enemy.y += 132 * delta;
-        enemy.x += Math.sin(enemy.phase * 3.2) * 115 * delta;
+        enemy.y += 132 * delta * movement;
+        enemy.x += Math.sin(enemy.phase * 3.2) * 115 * delta * movement;
         enemy.x += (this.player.x - enemy.x) * Math.min(1, delta * 0.45);
         enemy.x = clamp(enemy.x, FIELD.left + enemy.width, FIELD.right - enemy.width);
         if (!enemy.noAttack && enemy.y < this.player.y && Math.random() < delta * 0.55) this.fireStraight(enemy, 180);
@@ -128,8 +136,8 @@ export class MechaShooterMatch {
           this.takeHit();
         }
       } else if (enemy.kind === 'striker') {
-        enemy.y += 74 * delta;
-        enemy.x += Math.sin(enemy.phase * 2) * 70 * delta;
+        enemy.y += 74 * delta * movement;
+        enemy.x += Math.sin(enemy.phase * 2) * 70 * delta * movement;
         if (enemy.y < this.player.y && Math.random() < delta * 0.65) this.fireAimed(enemy, 190);
         if (enemy.y < this.player.y && Math.random() < delta * 0.2) this.fireDecorative(enemy);
         if (this.invulnerableSeconds <= 0 && hit({ x: this.player.x, y: this.player.y }, enemy)) {
@@ -137,11 +145,11 @@ export class MechaShooterMatch {
           this.takeHit();
         }
       } else if (enemy.kind === 'guard') {
-        enemy.y += 34 * delta;
+        enemy.y += 34 * delta * movement;
         if (enemy.y < this.player.y && Math.random() < delta * 0.45) this.fireSpread(enemy, 175);
         if (enemy.y < this.player.y && Math.random() < delta * 0.15) this.fireDecorative(enemy);
       } else if (enemy.kind === 'turret') {
-        enemy.y += 18 * delta;
+        enemy.y += 18 * delta * movement;
         enemy.lifeTimer = (enemy.lifeTimer ?? 7) - delta;
         if ((enemy.lifeTimer ?? 0) <= 0) enemy.y = FIELD.bottom + 100;
         if (enemy.y < this.player.y && (enemy.attackCooldown ?? 0) <= 0 && (enemy.attackTelegraph ?? 0) <= 0) enemy.attackTelegraph = 0.28;
@@ -150,29 +158,42 @@ export class MechaShooterMatch {
           enemy.attackCooldown = 1.9;
         }
       } else if (enemy.kind === 'armor') {
-        enemy.y += 24 * delta;
+        enemy.y += 24 * delta * movement;
         if (enemy.y < this.player.y && Math.random() < delta * 0.35) this.fireAimed(enemy, 155);
         if (this.invulnerableSeconds <= 0 && hit({ x: this.player.x, y: this.player.y }, enemy)) {
           enemy.hp = 0;
           this.takeHit();
         }
       } else if (enemy.kind === 'splitter') {
-        enemy.y += 52 * delta;
-        enemy.x += Math.sin(enemy.phase * 3) * 90 * delta;
+        enemy.y += 52 * delta * movement;
+        enemy.x += Math.sin(enemy.phase * 3) * 90 * delta * movement;
         if (enemy.y < this.player.y && Math.random() < delta * 0.5) this.fireSpread(enemy, 190);
         if (this.invulnerableSeconds <= 0 && hit({ x: this.player.x, y: this.player.y }, enemy)) {
           enemy.hp = 0;
           this.takeHit();
         }
+      } else if (enemy.kind === 'diver') {
+        updateDiver(enemy, delta, this.player);
+        if (this.invulnerableSeconds <= 0 && hit(this.player, enemy)) {
+          enemy.hp = 0;
+          this.takeHit();
+        }
+      } else if (this.stage === 3) {
+        const result = updateStage3Boss(enemy, delta, this.player);
+        if (result.clearHostile) this.bullets = this.bullets.filter((bullet) => bullet.fromPlayer);
+        if (result.phaseChanged) this.events.push('boss-phase-changed');
+        if (this.bombActiveSeconds <= 0) this.bullets.push(...result.bullets);
+      } else if (this.stage === 2) {
+        const result = updateStage2Boss(enemy, delta, this.player);
+        if (result.transformed) {
+          this.bullets = this.bullets.filter((bullet) => bullet.fromPlayer);
+          this.events.push('boss-phase-changed');
+        }
+        if (this.bombActiveSeconds <= 0) this.bullets.push(...result.bullets);
       } else {
         if (!enemy.dashState) {
-          if (this.stage === 2) {
-            enemy.x = 640 + Math.sin(enemy.phase * 0.45) * 300;
-            enemy.y = 135 + Math.sin(enemy.phase * 0.9) * 48;
-          } else {
-            enemy.x = 640 + Math.sin(enemy.phase * 0.8) * 280;
-            enemy.y = 115 + Math.sin(enemy.phase * 0.55) * 30;
-          }
+          enemy.x = 640 + Math.sin(enemy.phase * 0.8) * 280;
+          enemy.y = 115 + Math.sin(enemy.phase * 0.55) * 30;
         }
         if (enemy.hp <= enemy.maxHp / 3 && !enemy.dashState && (enemy.dashCooldown ?? 0) <= 0) {
           enemy.dashState = 'telegraph';
@@ -216,10 +237,14 @@ export class MechaShooterMatch {
     }
 
     this.resolveCollisions();
-    this.bullets = this.bullets.filter((bullet) => bullet.y > -30 && bullet.y < FIELD.bottom + 40);
-    this.enemies = this.enemies.filter((enemy) => enemy.y < FIELD.bottom + 80 && enemy.hp > 0);
-    if (this.bossSpawned && this.bossIntroSeconds <= 0 && !this.enemies.some((enemy) => enemy.kind === 'boss')) {
+    if (this.bombActiveSeconds > 0) this.bullets = this.bullets.filter((bullet) => bullet.fromPlayer);
+    this.bullets = this.bullets.filter((bullet) => bullet.kind
+      ? bullet.y > -80 && bullet.y < FIELD.bottom + 80 && bullet.x > FIELD.left - 100 && bullet.x < FIELD.right + 100
+      : bullet.y > -30 && bullet.y < FIELD.bottom + 40);
+    this.enemies = this.enemies.filter((enemy) => enemy.y < FIELD.bottom + 80 && enemy.hp > 0 && (enemy.kind !== 'diver' || enemy.x > FIELD.left - 80 && enemy.x < FIELD.right + 80));
+    if (this.status === 'playing' && this.bossSpawned && this.bossIntroSeconds <= 0 && !this.enemies.some((enemy) => enemy.kind === 'boss')) {
       this.status = 'clear';
+      if (this.stage >= 2) this.bullets = this.bullets.filter((bullet) => bullet.fromPlayer);
       this.events.push('clear');
     }
   }
@@ -240,6 +265,7 @@ export class MechaShooterMatch {
     for (const enemy of this.enemies) {
       if (Math.hypot(enemy.x - this.player.x, enemy.y - this.player.y) <= BOMB_RADIUS) {
         if (enemy.kind === 'boss') {
+          if (enemy.stage2Boss?.form === 'transforming' || (enemy.stage3Boss?.transformSeconds ?? 0) > 0) continue;
           enemy.hp = Math.max(1, enemy.hp - enemy.maxHp / 4);
         } else if (enemy.hp > 0) {
           enemy.hp = 0;
@@ -253,7 +279,19 @@ export class MechaShooterMatch {
   }
 
   snapshot(): ShooterSnapshot {
-    return { player: { ...this.player }, bullets: this.bullets.map((b) => ({ ...b })), enemies: this.enemies.map((e) => ({ ...e })), powerUps: this.powerUps.map((p) => ({ ...p })), lives: this.lives, score: this.score, bombCount: this.bombCount, status: this.status, invulnerableSeconds: this.invulnerableSeconds, bombActiveSeconds: this.bombActiveSeconds, powerLevel: this.powerLevel, wideLevel: this.wideLevel, shield: this.shield, bossWarning: this.bossSpawned };
+    return {
+      player: { ...this.player }, bullets: this.bullets.map((b) => ({ ...b })),
+      enemies: this.enemies.map((e) => ({
+        ...e,
+        ...(e.stage2Boss ? { stage2Boss: { ...e.stage2Boss, target: { ...e.stage2Boss.target } } } : {}),
+        ...(e.stage3Boss ? { stage3Boss: { ...e.stage3Boss, target: { ...e.stage3Boss.target }, transformFrom: { ...e.stage3Boss.transformFrom } } } : {}),
+        ...(e.diver ? { diver: { ...e.diver, target: { ...e.diver.target }, velocity: { ...e.diver.velocity } } } : {}),
+      })),
+      powerUps: this.powerUps.map((p) => ({ ...p })), lives: this.lives, score: this.score,
+      bombCount: this.bombCount, status: this.status, invulnerableSeconds: this.invulnerableSeconds,
+      bombActiveSeconds: this.bombActiveSeconds, powerLevel: this.powerLevel,
+      wideLevel: this.wideLevel, shield: this.shield, bossWarning: this.bossSpawned,
+    };
   }
 
   consumeEvents(): ShooterEvent[] { return this.events.splice(0); }
@@ -272,9 +310,17 @@ export class MechaShooterMatch {
     for (const bullet of this.bullets) {
       if (bullet.fromPlayer) {
         for (const enemy of this.enemies) {
-          if (enemy.hp <= 0 || !hit(bullet, enemy)) continue;
+          if (enemy.hp <= 0) continue;
+          if (enemy.kind === 'boss' && this.stage === 2) {
+            const impact = stage2ShotImpact(enemy, bullet);
+            if (!impact) continue;
+            if (impact === 'armor') {
+              bullet.y = -100;
+              break;
+            }
+          } else if (!hit(bullet, enemy)) continue;
           // 突進の予告中・突進中は攻撃を受け付けない。弾幕を途切れさせずに済むよう、弾だけ消費する。
-          if (enemy.kind === 'boss' && enemy.dashState) {
+          if (enemy.kind === 'boss' && (enemy.dashState || (enemy.stage3Boss?.transformSeconds ?? 0) > 0)) {
             bullet.y = -100;
             break;
           }
@@ -298,7 +344,7 @@ export class MechaShooterMatch {
           }
           break;
         }
-      } else if (!bullet.decorative && this.invulnerableSeconds <= 0 && hit(bullet, { x: this.player.x, y: this.player.y, width: PLAYER_HITBOX.width, height: PLAYER_HITBOX.height })) {
+      } else if (!bullet.decorative && this.invulnerableSeconds <= 0 && (bullet.kind === 'drill' ? drillHitsPlayer(bullet, this.player) : hit(bullet, { x: this.player.x, y: this.player.y, width: PLAYER_HITBOX.width, height: PLAYER_HITBOX.height }))) {
         bullet.y = FIELD.bottom + 100;
         this.takeHit();
       }
@@ -335,8 +381,23 @@ export class MechaShooterMatch {
       [{ kind: 'turret', offset: -260, y: 30 }, { kind: 'turret', offset: 260, y: 30 }, { kind: 'splitter', offset: 0, y: 95 }],
       [{ kind: 'armor', offset: -250, y: 35 }, { kind: 'splitter', offset: -80, y: 75 }, { kind: 'splitter', offset: 80, y: 75 }, { kind: 'armor', offset: 250, y: 35 }],
     ];
-    const patterns = this.stage === 2 ? stage2Patterns : stage1Patterns;
-    const resourceSchedule: Array<{ wave: number; kind: PowerUpKind; carrier: EnemyKind }> = this.stage === 2 ? [
+    const stage3Patterns: Array<Array<{ kind: EnemyKind; offset: number; y: number }>> = [
+      [{ kind: 'striker', offset: -180, y: 30 }, { kind: 'diver', offset: 0, y: 35 }, { kind: 'striker', offset: 180, y: 30 }],
+      [{ kind: 'guard', offset: 0, y: 30 }, { kind: 'scout', offset: -220, y: 50 }, { kind: 'scout', offset: 220, y: 50 }],
+      [{ kind: 'diver', offset: -200, y: 20 }, { kind: 'striker', offset: 0, y: 60 }, { kind: 'diver', offset: 200, y: 20 }],
+      [{ kind: 'turret', offset: -230, y: 30 }, { kind: 'splitter', offset: 0, y: 60 }, { kind: 'turret', offset: 230, y: 30 }],
+      [{ kind: 'armor', offset: 0, y: 30 }, { kind: 'diver', offset: -250, y: 65 }, { kind: 'diver', offset: 250, y: 65 }],
+      [-2, -1, 0, 1, 2].map((index) => ({ kind: 'striker', offset: index * 100, y: 25 + Math.abs(index) * 20 })),
+    ];
+    const patterns = this.stage === 3 ? stage3Patterns : this.stage === 2 ? stage2Patterns : stage1Patterns;
+    const resourceSchedule: Array<{ wave: number; kind: PowerUpKind; carrier: EnemyKind }> = this.stage === 3 ? [
+      { wave: 0, kind: 'POWER', carrier: 'striker' },
+      { wave: 1, kind: 'SHIELD', carrier: 'guard' },
+      { wave: 4, kind: 'BOMB', carrier: 'armor' },
+      { wave: 5, kind: 'WIDE', carrier: 'striker' },
+      { wave: 10, kind: 'BOMB', carrier: 'armor' },
+      { wave: 13, kind: 'SHIELD', carrier: 'guard' },
+    ] : this.stage === 2 ? [
       { wave: 0, kind: 'WIDE', carrier: 'armor' },
       { wave: 2, kind: 'SHIELD', carrier: 'armor' },
       { wave: 4, kind: 'POWER', carrier: 'armor' },
@@ -349,9 +410,10 @@ export class MechaShooterMatch {
     ];
     const scheduled = resourceSchedule.find((item) => item.wave === this.waveIndex);
     for (const entry of patterns[this.waveIndex % patterns.length]) {
-      const size = entry.kind === 'guard' || entry.kind === 'turret' ? { width: 58, height: 48, hp: 8 } : entry.kind === 'armor' ? { width: 70, height: 58, hp: 14 } : entry.kind === 'splitter' ? { width: 42, height: 38, hp: 4 } : { width: 32, height: 30, hp: entry.kind === 'striker' ? 3 : 2 };
+      const size = entry.kind === 'diver' ? { width: 30, height: 42, hp: 8 } : entry.kind === 'guard' || entry.kind === 'turret' ? { width: 58, height: 48, hp: 8 } : entry.kind === 'armor' ? { width: 70, height: 58, hp: 14 } : entry.kind === 'splitter' ? { width: 42, height: 38, hp: 4 } : { width: 32, height: 30, hp: entry.kind === 'striker' ? 3 : 2 };
+      const hp = this.stage === 3 && entry.kind !== 'diver' ? Math.ceil(size.hp * 1.25) : size.hp;
       const isCarrier = scheduled && entry.kind === scheduled.carrier && !this.enemies.some((enemy) => enemy.resourceKind === scheduled.kind);
-      this.enemies.push({ x: center + entry.offset, y: entry.y, kind: entry.kind, width: size.width, height: size.height, hp: size.hp, maxHp: size.hp, phase: Math.random() * Math.PI * 2, resourceKind: isCarrier ? scheduled.kind : undefined });
+      this.enemies.push({ x: center + entry.offset, y: entry.y, kind: entry.kind, width: size.width, height: size.height, hp, maxHp: hp, phase: Math.random() * Math.PI * 2, resourceKind: isCarrier ? scheduled.kind : undefined, ...(entry.kind === 'diver' ? { diver: createDiverState() } : {}) });
     }
     this.waveIndex += 1;
   }
@@ -408,6 +470,7 @@ function scoreForEnemy(kind: EnemyKind): number {
   if (kind === 'armor') return 300;
   if (kind === 'turret') return 250;
   if (kind === 'splitter') return 180;
+  if (kind === 'diver') return 220;
   return 100;
 }
 function moveToward(value: number, target: number, maxStep: number): number {

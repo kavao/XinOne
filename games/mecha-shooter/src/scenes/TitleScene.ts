@@ -8,6 +8,7 @@ export const MECHA_SHOOTER_GAME_SCENE = 'mecha-shooter:game';
 export const MECHA_STAGES = [
   { id: 1, name: 'ORBITAL ELEVATOR' },
   { id: 2, name: 'DUST MINING BASE' },
+  { id: 3, name: 'STRATOSPHERE CITADEL' },
 ] as const;
 
 export class MechaShooterTitleScene extends Phaser.Scene {
@@ -18,13 +19,12 @@ export class MechaShooterTitleScene extends Phaser.Scene {
     playSharedBgm(this, 'title');
     this.cameras.main.setBackgroundColor(0x090e1b);
     this.add.text(640, 100, 'MECHA VANGUARD', { fontFamily: 'Arial Black', fontSize: '54px', color: '#ff8066' }).setOrigin(0.5);
-    this.add.text(640, 164, 'A two-stage original mecha vertical shooter', { fontFamily: 'Arial', fontSize: '22px', color: '#cbd6ea' }).setOrigin(0.5);
+    this.add.text(640, 164, 'A three-stage original mecha vertical shooter', { fontFamily: 'Arial', fontSize: '22px', color: '#cbd6ea' }).setOrigin(0.5);
     this.add.text(640, 202, 'Move: mouse   Auto-fire   Bomb: right click', { fontFamily: 'Arial', fontSize: '20px', color: '#8ed8ff' }).setOrigin(0.5);
     this.add.text(640, 248, 'After GAME OVER you can CONTINUE the current stage.', { fontFamily: 'Arial', fontSize: '18px', color: '#cbd6ea' }).setOrigin(0.5);
     this.button(640, 330, 'START', () => this.scene.start(MECHA_SHOOTER_GAME_SCENE, { runtime: this.runtime }), 260);
     this.add.text(640, 400, 'STAGE SELECT', { fontFamily: 'Arial Black', fontSize: '18px', color: '#ffd166' }).setOrigin(0.5);
-    this.stageChip(470, 478, MECHA_STAGES[0]);
-    this.stageChip(810, 478, MECHA_STAGES[1]);
+    MECHA_STAGES.forEach((stage, index) => this.stageChip(300 + index * 340, 478, stage));
     this.button(500, 640, 'LAUNCHER', () => this.runtime.returnToLauncher());
     if (this.runtime.canToggleFullscreen()) this.button(780, 640, 'FULLSCREEN', () => void this.runtime.toggleFullscreen());
   }

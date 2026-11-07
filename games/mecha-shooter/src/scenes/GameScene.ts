@@ -2,6 +2,8 @@ import type { GameSceneData, RuntimeActions } from '@xinone/game-contracts';
 import { playClickSound, playOutcomeSound, playSharedBgm } from '@xinone/shared-assets';
 import Phaser from 'phaser';
 import { BOMB_RADIUS, FIELD, MechaShooterMatch, type DestroyedEnemy, type ShooterSnapshot } from '../domain/mecha-shooter';
+import { DRILL_SIZE, getArmMuzzle, getDrillMuzzle, getDrillScale, getStage2WeakPoint, STAGE2_BOSS_SIZE } from '../domain/stage2-boss';
+import { STAGE3_BOSS_SIZE, STAGE3_SAFE_WIDTH } from '../domain/stage3';
 import { MECHA_SHOOTER_IMAGES } from '../image-manifest';
 import { MECHA_SHOOTER_GAME_SCENE, MECHA_STAGES } from './TitleScene';
 
@@ -48,6 +50,9 @@ export class MechaShooterGameScene extends Phaser.Scene {
   private bossSprite?: Phaser.GameObjects.Image;
   private bossHpGraphics?: Phaser.GameObjects.Graphics;
   private enemySprites: Phaser.GameObjects.Image[] = [];
+  private drillSprites: Phaser.GameObjects.Image[] = [];
+  private bossEffects!: Phaser.GameObjects.Graphics;
+  private bossHint!: Phaser.GameObjects.Text;
   private shockwaves: Shockwave[] = [];
   private bossDefeatCountdown = 0;
   private bossDefeatPosition = { x: 640, y: 120 };
@@ -78,18 +83,12 @@ export class MechaShooterGameScene extends Phaser.Scene {
     this.bossSprite = undefined;
     this.bossHpGraphics = undefined;
     this.enemySprites = [];
+    this.drillSprites = [];
     this.bossDefeatCountdown = 0;
     this.gameOverCountdown = 0;
   }
   preload(): void {
-    if (!this.textures.exists(MECHA_SHOOTER_IMAGES.player.key)) this.load.image(MECHA_SHOOTER_IMAGES.player.key, MECHA_SHOOTER_IMAGES.player.url);
-    if (!this.textures.exists(MECHA_SHOOTER_IMAGES.bossStage1.key)) this.load.image(MECHA_SHOOTER_IMAGES.bossStage1.key, MECHA_SHOOTER_IMAGES.bossStage1.url);
-    if (!this.textures.exists(MECHA_SHOOTER_IMAGES.bossStage1Charge.key)) this.load.image(MECHA_SHOOTER_IMAGES.bossStage1Charge.key, MECHA_SHOOTER_IMAGES.bossStage1Charge.url);
-    if (!this.textures.exists(MECHA_SHOOTER_IMAGES.bossStage2.key)) this.load.image(MECHA_SHOOTER_IMAGES.bossStage2.key, MECHA_SHOOTER_IMAGES.bossStage2.url);
-    for (const image of [MECHA_SHOOTER_IMAGES.scout, MECHA_SHOOTER_IMAGES.striker, MECHA_SHOOTER_IMAGES.guard]) {
-      if (!this.textures.exists(image.key)) this.load.image(image.key, image.url);
-    }
-    for (const image of [MECHA_SHOOTER_IMAGES.stage2Armor, MECHA_SHOOTER_IMAGES.stage2Turret, MECHA_SHOOTER_IMAGES.stage2Splitter]) {
+    for (const image of Object.values(MECHA_SHOOTER_IMAGES)) {
       if (!this.textures.exists(image.key)) this.load.image(image.key, image.url);
     }
   }
@@ -97,6 +96,8 @@ export class MechaShooterGameScene extends Phaser.Scene {
     playSharedBgm(this, 'active');
     this.cameras.main.setBackgroundColor(0x070b16);
     this.graphics = this.add.graphics();
+    this.bossEffects = this.add.graphics().setDepth(7);
+    this.bossHint = this.add.text(640, 54, '', { fontFamily: 'Arial Black', fontSize: '16px', color: '#ffd166', stroke: '#10182a', strokeThickness: 4 }).setOrigin(0.5, 0).setDepth(12);
     this.hud = this.add.text(28, 18, '', { fontFamily: 'Arial', fontSize: '19px', color: '#d9e7ff' });
     this.stageLabel = this.add.text(640, 18, this.stageTitle(), { fontFamily: 'Arial Black', fontSize: '20px', color: '#ffd166' }).setOrigin(0.5, 0);
     this.add.text(1150, 690, 'Launcher', { fontFamily: 'Arial Black', fontSize: '18px', color: '#ffffff', backgroundColor: '#18243d', padding: { left: 16, right: 16, top: 8, bottom: 8 } }).setOrigin(0.5).setInteractive({ useHandCursor: true }).on('pointerdown', () => this.leaveToLauncher());
@@ -123,7 +124,7 @@ export class MechaShooterGameScene extends Phaser.Scene {
         this.updateShockwaves(delta / 1000);
         if (Math.random() < 0.18) this.cameras.main.shake(100, 0.004);
         if (this.bossDefeatCountdown <= 0) {
-          if (this.stage === 1) this.startStage2();
+          if (this.stage < MECHA_STAGES.length) this.startNextStage();
           else this.showResult(true);
         }
       }
@@ -165,6 +166,17 @@ export class MechaShooterGameScene extends Phaser.Scene {
         this.cameras.main.shake(180, 0.004);
       }
       if (event === 'boss-arrived') playClickSound(this);
+      if (event === 'boss-phase-changed') {
+        const boss = this.match.snapshot().enemies.find((enemy) => enemy.kind === 'boss');
+        const color = this.stage === 3 ? 0x65d8ff : 0xffc15a;
+        if (boss) {
+          this.spawnShockwave(boss.x, boss.y, 170, color);
+          this.spawnImpactParticles(boss.x, boss.y, 30, color);
+        }
+        this.cameras.main.flash(220, 255, 190, 80);
+        this.cameras.main.shake(350, 0.005);
+        playClickSound(this);
+      }
       if (event === 'player-hit') {
         const player = this.match.snapshot().player;
         this.spawnImpactParticles(player.x, player.y, 24, 0xffd166);
@@ -189,20 +201,30 @@ export class MechaShooterGameScene extends Phaser.Scene {
   }
   private render(snapshot: ShooterSnapshot): void {
     this.graphics.clear();
+    this.bossEffects.clear();
+    this.bossHint.setText('');
     this.renderBackground();
     if (this.damageFlash > 0) this.graphics.fillStyle(0xff4d5d, this.damageFlash * 0.55).fillRect(FIELD.left, 0, FIELD.right - FIELD.left, FIELD.bottom);
     this.graphics.lineStyle(2, 0x263759, 1).strokeRect(FIELD.left, 0, FIELD.right - FIELD.left, FIELD.bottom);
+    let drillSpriteIndex = 0;
     for (const bullet of snapshot.bullets) {
       if (bullet.fromPlayer) {
         this.graphics.fillStyle(0x07101d, 1).fillRoundedRect(bullet.x - 5, bullet.y - 13, 10, 26, 5);
         this.graphics.fillStyle(0x8ed8ff, 1).fillRoundedRect(bullet.x - 3, bullet.y - 11, 6, 22, 3);
+      } else if (bullet.kind === 'drill') {
+        const sprite = this.drillSprites[drillSpriteIndex] ?? this.add.image(bullet.x, bullet.y, MECHA_SHOOTER_IMAGES.bossStage2DrillBullet.key).setDepth(6);
+        this.drillSprites[drillSpriteIndex] = sprite;
+        const scale = getDrillScale(bullet);
+        sprite.setPosition(bullet.x, bullet.y).setDisplaySize(DRILL_SIZE.width * scale, DRILL_SIZE.height * scale).setRotation(Math.atan2(bullet.vy, bullet.vx) - Math.PI / 2).setVisible(true);
+        drillSpriteIndex += 1;
       } else {
-        const coreColor = bullet.decorative ? 0xb28cff : bullet.damage > 0 ? 0xff705d : 0xffc15a;
+        const coreColor = bullet.decorative ? 0xb28cff : bullet.kind === 'suppressive' ? 0xffc15a : bullet.damage > 0 ? 0xff705d : 0xffc15a;
         this.graphics.fillStyle(0x050912, 1).fillCircle(bullet.x, bullet.y, bullet.radius + 3);
         this.graphics.fillStyle(coreColor, 1).fillCircle(bullet.x, bullet.y, bullet.radius);
         this.graphics.fillStyle(0xffffff, 0.8).fillCircle(bullet.x - bullet.radius * 0.3, bullet.y - bullet.radius * 0.3, Math.max(1, bullet.radius * 0.22));
       }
     }
+    for (; drillSpriteIndex < this.drillSprites.length; drillSpriteIndex += 1) this.drillSprites[drillSpriteIndex].setVisible(false);
     for (const particle of this.particles) {
       const alpha = particle.life / particle.maxLife;
       this.graphics.fillStyle(particle.color, alpha);
@@ -250,14 +272,33 @@ export class MechaShooterGameScene extends Phaser.Scene {
         this.graphics.lineStyle(3, 0xff4d5d, 0.95);
         this.graphics.strokeCircle(enemy.x, enemy.y, 34 + Math.sin(enemy.phase * 18) * 4);
       }
-      const bossImage = this.stage === 2 ? MECHA_SHOOTER_IMAGES.bossStage2 : MECHA_SHOOTER_IMAGES.bossStage1;
+      if (enemy.diver?.mode === 'telegraph') {
+        this.bossEffects.lineStyle(2, 0xffd166, 0.65);
+        this.bossEffects.lineBetween(enemy.x, enemy.y, enemy.diver.target.x, enemy.diver.target.y);
+        this.bossEffects.strokeCircle(enemy.x, enemy.y, 26 + enemy.diver.seconds * 10);
+      }
+      if (enemy.diver?.mode === 'diving') {
+        const velocity = enemy.diver.velocity;
+        const speed = Math.hypot(velocity.x, velocity.y);
+        const ux = velocity.x / speed;
+        const uy = velocity.y / speed;
+        const acceleration = Math.max(0, Math.min(1, (speed - 640) / 460));
+        const rearX = enemy.x - ux * 34;
+        const rearY = enemy.y - uy * 34;
+        const halfWidth = 4 + acceleration * 4;
+        const length = 18 + acceleration * 38;
+        this.bossEffects.fillStyle(0x65d8ff, 0.55 + acceleration * 0.25);
+        this.bossEffects.fillTriangle(rearX - uy * halfWidth, rearY + ux * halfWidth, rearX + uy * halfWidth, rearY - ux * halfWidth, rearX - ux * length, rearY - uy * length);
+      }
+      const bossImage = this.stage === 3 ? MECHA_SHOOTER_IMAGES.bossStage3Flight : this.stage === 2 ? MECHA_SHOOTER_IMAGES.bossStage2 : MECHA_SHOOTER_IMAGES.bossStage1;
       const hasBossSprite = enemy.kind === 'boss' && this.textures.exists(bossImage.key);
-      const enemyImage = enemy.kind === 'scout' ? MECHA_SHOOTER_IMAGES.scout : enemy.kind === 'striker' ? MECHA_SHOOTER_IMAGES.striker : enemy.kind === 'guard' ? MECHA_SHOOTER_IMAGES.guard : enemy.kind === 'armor' ? MECHA_SHOOTER_IMAGES.stage2Armor : enemy.kind === 'turret' ? MECHA_SHOOTER_IMAGES.stage2Turret : enemy.kind === 'splitter' ? MECHA_SHOOTER_IMAGES.stage2Splitter : undefined;
+      const enemyImage = enemy.kind === 'diver' ? MECHA_SHOOTER_IMAGES.stage3Diver : enemy.kind === 'scout' ? MECHA_SHOOTER_IMAGES.scout : enemy.kind === 'striker' ? MECHA_SHOOTER_IMAGES.striker : enemy.kind === 'guard' ? MECHA_SHOOTER_IMAGES.guard : enemy.kind === 'armor' ? MECHA_SHOOTER_IMAGES.stage2Armor : enemy.kind === 'turret' ? MECHA_SHOOTER_IMAGES.stage2Turret : enemy.kind === 'splitter' ? MECHA_SHOOTER_IMAGES.stage2Splitter : undefined;
       if (!hasBossSprite && enemyImage && this.textures.exists(enemyImage.key)) {
-        const size = enemy.kind === 'guard' || enemy.kind === 'turret' ? 92 : enemy.kind === 'armor' ? 110 : enemy.kind === 'splitter' ? 70 : enemy.kind === 'striker' ? 78 : 58;
+        const size = enemy.kind === 'diver' ? 72 : enemy.kind === 'guard' || enemy.kind === 'turret' ? 92 : enemy.kind === 'armor' ? 110 : enemy.kind === 'splitter' ? 70 : enemy.kind === 'striker' ? 78 : 58;
         const sprite = this.enemySprites[enemySpriteIndex] ?? this.add.image(enemy.x, enemy.y, enemyImage.key);
         this.enemySprites[enemySpriteIndex] = sprite;
-        sprite.setTexture(enemyImage.key).setPosition(enemy.x, enemy.y).setDisplaySize(size, size).setAlpha(1);
+        const diveAngle = enemy.diver?.mode === 'diving' ? Math.atan2(enemy.diver.velocity.y, enemy.diver.velocity.x) - Math.PI / 2 : 0;
+        sprite.setTexture(enemyImage.key).setPosition(enemy.x, enemy.y).setDisplaySize(size, enemy.kind === 'diver' ? 80 : size).setRotation(diveAngle).setAlpha(1);
         enemySpriteIndex += 1;
       } else if (!hasBossSprite) {
         const enemyColor = enemy.kind === 'boss' ? 0x8d4d78 : enemy.kind === 'armor' ? 0x6d7180 : enemy.kind === 'turret' ? 0x8b624e : enemy.kind === 'splitter' ? 0x8a5eb5 : enemy.kind === 'guard' ? 0x9b6b4e : enemy.kind === 'striker' ? 0x4e8b78 : 0x4a6b91;
@@ -268,7 +309,8 @@ export class MechaShooterGameScene extends Phaser.Scene {
     }
     for (; enemySpriteIndex < this.enemySprites.length; enemySpriteIndex += 1) this.enemySprites[enemySpriteIndex].setAlpha(0);
     const boss = snapshot.enemies.find((enemy) => enemy.kind === 'boss');
-    if (boss && this.textures.exists(MECHA_SHOOTER_IMAGES.bossStage1.key)) {
+    const normalBossTexture = this.stage === 3 ? MECHA_SHOOTER_IMAGES.bossStage3Flight : this.stage === 2 ? MECHA_SHOOTER_IMAGES.bossStage2 : MECHA_SHOOTER_IMAGES.bossStage1;
+    if (boss && this.textures.exists(normalBossTexture.key)) {
       if (boss.dashState === 'dash') {
         const jetPulse = 0.8 + Math.sin(boss.phase * 30) * 0.2;
         this.graphics.fillStyle(0x65d8ff, 0.72 * jetPulse);
@@ -279,15 +321,74 @@ export class MechaShooterGameScene extends Phaser.Scene {
         this.graphics.lineBetween(boss.x - 25, boss.y - 72, boss.x - 42, boss.y - 145);
         this.graphics.lineBetween(boss.x + 25, boss.y - 72, boss.x + 42, boss.y - 145);
       }
-      const normalBossTexture = this.stage === 2 ? MECHA_SHOOTER_IMAGES.bossStage2 : MECHA_SHOOTER_IMAGES.bossStage1;
-      const bossTexture = this.stage === 1 && boss.dashState ? MECHA_SHOOTER_IMAGES.bossStage1Charge : normalBossTexture;
-      if (!this.bossSprite) this.bossSprite = this.add.image(boss.x, boss.y, bossTexture.key).setDisplaySize(220, 145);
-      this.bossSprite.setTexture(bossTexture.key).setPosition(boss.x, boss.y).setDisplaySize(this.stage === 2 ? 260 : boss.dashState ? 235 : 220, this.stage === 2 ? 190 : boss.dashState ? 155 : 145).setAlpha(1);
-      if (!this.bossHpGraphics) this.bossHpGraphics = this.add.graphics();
+      const state = boss.stage2Boss;
+      const citadel = boss.stage3Boss;
+      const bossTexture = citadel ? citadel.mode === 'flight' ? MECHA_SHOOTER_IMAGES.bossStage3Flight : MECHA_SHOOTER_IMAGES.bossStage3Humanoid : state
+        ? state.form !== 'normal' ? MECHA_SHOOTER_IMAGES.bossStage2Phase2
+          : state.armor === 'left' ? MECHA_SHOOTER_IMAGES.bossStage2OpenLeft
+            : state.armor === 'right' ? MECHA_SHOOTER_IMAGES.bossStage2OpenRight : normalBossTexture
+        : this.stage === 1 && boss.dashState ? MECHA_SHOOTER_IMAGES.bossStage1Charge : normalBossTexture;
+      if (!this.bossSprite) this.bossSprite = this.add.image(boss.x, boss.y, bossTexture.key).setDepth(3);
+      this.bossSprite.setTexture(bossTexture.key).setPosition(boss.x, boss.y).setDisplaySize(citadel ? STAGE3_BOSS_SIZE.width : state ? STAGE2_BOSS_SIZE.width : boss.dashState ? 235 : 220, citadel ? STAGE3_BOSS_SIZE.height : state ? STAGE2_BOSS_SIZE.height : boss.dashState ? 155 : 145).setAlpha(citadel && citadel.transformSeconds > 0 ? 0.65 : 1);
+      if (state) {
+        const weakPoint = getStage2WeakPoint(boss);
+        const pulse = 0.65 + Math.abs(Math.sin(boss.phase * 7)) * 0.35;
+        if (weakPoint) {
+          this.bossEffects.lineStyle(2, 0xffd166, pulse).strokeCircle(weakPoint.x, weakPoint.y, weakPoint.radius + 3);
+        }
+        const armorHint = state.form === 'transforming' ? 'ARMOR DEPLOYING'
+          : state.form === 'overdrive' ? 'MINE WARDEN — CORE EXPOSED'
+            : state.armor === 'closed' ? 'MINE WARDEN — ARMOR CLOSED'
+              : `AIM AT THE ${state.armor.toUpperCase()} ORANGE CORE`;
+        const chargingDrill = state.attack === 'drill-charge' || state.attack === 'drill-burst';
+        if (state.armChargeSeconds > 0) {
+          const muzzle = getArmMuzzle(boss);
+          this.bossEffects.lineStyle(2, 0xffc15a, pulse).strokeCircle(muzzle.x, muzzle.y, 10 + state.armChargeSeconds * 24);
+        }
+        this.bossHint.setText(`${armorHint}${chargingDrill ? '  /  DRILL INCOMING' : state.attack === 'special-charge' ? '  /  CANNONS CHARGING' : ''}`);
+        if (chargingDrill) {
+          const muzzle = getDrillMuzzle(boss);
+          const dx = state.target.x - muzzle.x;
+          const dy = Math.max(80, state.target.y - muzzle.y);
+          const length = Math.hypot(dx, dy);
+          const ux = dx / length;
+          const uy = dy / length;
+          const distance = Math.min((FIELD.bottom - muzzle.y) / uy, ux > 0 ? (FIELD.right - muzzle.x) / ux : ux < 0 ? (FIELD.left - muzzle.x) / ux : Infinity);
+          this.bossEffects.lineStyle(3, 0xff705d, 0.6 * pulse);
+          for (let step = 0; step < distance; step += 28) {
+            const end = Math.min(step + 13, distance);
+            this.bossEffects.lineBetween(muzzle.x + ux * step, muzzle.y + uy * step, muzzle.x + ux * end, muzzle.y + uy * end);
+          }
+          this.bossEffects.lineStyle(3, 0xffd166, pulse).strokeCircle(muzzle.x, muzzle.y, 14 + state.attackSeconds * 12);
+        }
+        if (state.attack === 'special-charge') {
+          this.bossEffects.lineStyle(4, 0xb28cff, pulse);
+          for (const side of [-1, 1]) this.bossEffects.strokeCircle(boss.x + side * 46, boss.y - 45, 16 + state.attackSeconds * 12);
+        }
+      }
+      if (citadel) {
+        const pulse = 0.65 + Math.abs(Math.sin(boss.phase * 7)) * 0.35;
+        this.bossHint.setText(citadel.transformSeconds > 0 ? 'SKY COMMANDER — TRANSFORMING'
+          : citadel.final ? 'FINAL BARRAGE — FOLLOW THE GREEN CORRIDOR'
+            : `${citadel.mode === 'flight' ? 'FLIGHT FORM — AIMED BURST' : 'HUMANOID FORM — TRIPLE FAN'}${citadel.attack === 'volley-charge' ? ' / CHARGING' : citadel.attack === 'volley-burst' ? ' / FIRING' : ''}`);
+        if (citadel.final && citadel.transformSeconds === 0) {
+          const top = boss.y + 75;
+          this.bossEffects.fillStyle(0x65ffa9, 0.06).fillRect(citadel.safeLaneX - STAGE3_SAFE_WIDTH / 2, top, STAGE3_SAFE_WIDTH, FIELD.bottom - top);
+          this.bossEffects.lineStyle(2, 0x65ffa9, pulse * 0.7);
+          for (const side of [-1, 1]) this.bossEffects.lineBetween(citadel.safeLaneX + side * STAGE3_SAFE_WIDTH / 2, top, citadel.safeLaneX + side * STAGE3_SAFE_WIDTH / 2, FIELD.bottom);
+          this.bossEffects.lineStyle(2, 0x65d8ff, pulse).strokeCircle(boss.x, boss.y - 15, 25 + pulse * 5);
+        }
+        if (citadel.attack === 'volley-charge' || citadel.attack === 'volley-burst') {
+          this.bossEffects.lineStyle(3, 0xff705d, pulse).strokeCircle(boss.x, boss.y + 50, 14 + citadel.attackSeconds * 20);
+          if (citadel.mode === 'flight') this.bossEffects.lineBetween(boss.x, boss.y + 50, citadel.target.x, citadel.target.y);
+        }
+      }
+      if (!this.bossHpGraphics) this.bossHpGraphics = this.add.graphics().setDepth(8);
       this.bossHpGraphics.clear();
-      this.bossHpGraphics.fillStyle(0x271522, 1).fillRect(boss.x - 80, boss.y + 82, 160, 10);
-      this.bossHpGraphics.fillStyle(0xff8066, 1).fillRect(boss.x - 80, boss.y + 82, 160 * boss.hp / boss.maxHp, 10);
-      this.bossHpGraphics.lineStyle(2, 0xffd166, 1).strokeRect(boss.x - 80, boss.y + 82, 160, 10);
+      const hpY = boss.y + (citadel ? 110 : state ? 96 : 82);
+      this.bossHpGraphics.fillStyle(0x271522, 1).fillRect(boss.x - 80, hpY, 160, 10);
+      this.bossHpGraphics.fillStyle(0xff8066, 1).fillRect(boss.x - 80, hpY, 160 * boss.hp / boss.maxHp, 10);
+      this.bossHpGraphics.lineStyle(2, 0xffd166, 1).strokeRect(boss.x - 80, hpY, 160, 10);
     } else if (this.bossSprite) {
       this.bossSprite.setAlpha(0);
       this.bossHpGraphics?.clear();
@@ -319,6 +420,26 @@ export class MechaShooterGameScene extends Phaser.Scene {
     const farOffset = (this.backgroundScroll * 34) % 180;
     const midOffset = (this.backgroundScroll * 92) % 150;
     const nearOffset = (this.backgroundScroll * 190) % 110;
+    if (this.stage === 3) {
+      this.graphics.fillGradientStyle(0x0b1730, 0x0b1730, 0x294b69, 0x294b69, 1).fillRect(left, 0, width, height);
+      // Far clouds, middle-distance fortress decks and close gantries scroll at different speeds.
+      for (let y = -200 + ((this.backgroundScroll * 38) % 200); y < height + 200; y += 200) {
+        this.graphics.fillStyle(0x9cbdd3, 0.13).fillEllipse(left + 180, y, 310, 65);
+        this.graphics.fillEllipse(left + width - 120, y + 70, 350, 80);
+      }
+      this.graphics.fillStyle(0x18283d, 1).fillRect(left, 0, 40, height).fillRect(left + width - 40, 0, 40, height);
+      for (let y = -240 + ((this.backgroundScroll * 90) % 240); y < height + 240; y += 240) {
+        this.graphics.fillStyle(0x3c5065, 1).fillRect(left + 12, y, 140, 28).fillRect(left + width - 152, y + 80, 140, 28);
+        this.graphics.lineStyle(4, 0x708295, 0.8).lineBetween(left + 16, y + 28, left + 132, y + 72);
+        this.graphics.lineBetween(left + width - 16, y + 108, left + width - 132, y + 152);
+        this.graphics.fillStyle(0x65d8ff, 0.8).fillRect(left + 28, y + 7, 35, 5).fillRect(left + width - 63, y + 87, 35, 5);
+      }
+      for (let y = -180 + ((this.backgroundScroll * 180) % 180); y < height + 180; y += 180) {
+        this.graphics.lineStyle(3, 0x849eb5, 0.45).lineBetween(left + 4, y, left + 68, y + 32);
+        this.graphics.lineBetween(left + width - 4, y + 70, left + width - 68, y + 102);
+      }
+      return;
+    }
     this.graphics.fillStyle(this.stage === 1 ? 0x0b1424 : 0xb36b3d, 1).fillRect(left, 0, width, height);
     if (this.stage === 2) {
       this.graphics.fillStyle(0xc7834b, 0.35);
@@ -426,13 +547,13 @@ export class MechaShooterGameScene extends Phaser.Scene {
     background.on('pointerover', () => background.setFillStyle(0x2b3b60));
     background.on('pointerout', () => background.setFillStyle(0x18243d));
   }
-  private startStage2(): void {
+  private startNextStage(): void {
     const previous = this.match.snapshot();
-    this.stage = 2;
+    this.stage += 1;
     this.clearAnnouncement?.destroy();
     this.clearAnnouncement = undefined;
     this.children.getByName('mecha-shooter:sector-secured')?.destroy();
-    this.match = new MechaShooterMatch(2);
+    this.match = new MechaShooterMatch(this.stage);
     this.match.lives = previous.lives;
     this.match.score = previous.score;
     this.match.bombCount = previous.bombCount;
@@ -443,6 +564,7 @@ export class MechaShooterGameScene extends Phaser.Scene {
     this.bossSprite?.setAlpha(0);
     this.bossHpGraphics?.clear();
     this.stageLabel.setText(this.stageTitle());
+    this.backgroundScroll = 0;
     this.spawnImpactParticles(640, 360, 70, 0x65d8ff);
     this.spawnShockwave(640, 360, 280, 0x65d8ff);
     this.cameras.main.flash(500, 45, 130, 190);
@@ -454,7 +576,7 @@ export class MechaShooterGameScene extends Phaser.Scene {
     if (this.match.useBomb()) playClickSound(this);
   }
   private spawnDefeatEffect(wreck: DestroyedEnemy): void {
-    const scoreValue = wreck.kind === 'armor' ? 300 : wreck.kind === 'turret' ? 250 : wreck.kind === 'splitter' ? 180 : wreck.kind === 'guard' ? 150 : 100;
+    const scoreValue = wreck.kind === 'diver' ? 220 : wreck.kind === 'armor' ? 300 : wreck.kind === 'turret' ? 250 : wreck.kind === 'splitter' ? 180 : wreck.kind === 'guard' ? 150 : 100;
     const scoreText = this.add.text(wreck.x, wreck.y, `+${scoreValue}`, { fontFamily: 'Arial Black', fontSize: '20px', color: '#ffd166', stroke: '#10182a', strokeThickness: 5 }).setOrigin(0.5).setDepth(18);
     this.tweens.add({ targets: scoreText, y: wreck.y - 52, alpha: 0, duration: 1400, ease: 'Cubic.easeOut', onComplete: () => scoreText.destroy() });
     if (wreck.kind === 'armor') {
