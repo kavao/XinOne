@@ -5,7 +5,7 @@ import { FloorHopperTitleScene, FLOOR_HOPPER_TITLE_SCENE } from './scenes/TitleS
 export const floorHopperDefinition: GameDefinition = {
   id: 'floor-hopper',
   title: 'Floor Hopper',
-  description: 'Jump across drifting floors. Space or click, with a double jump.',
+  description: 'Ride morning to dawn, glide after a double jump, and survive the fast night.',
   accentColor: 0x5eead4,
   startScene: FLOOR_HOPPER_TITLE_SCENE,
   scenes: [FloorHopperTitleScene, FloorHopperGameScene],

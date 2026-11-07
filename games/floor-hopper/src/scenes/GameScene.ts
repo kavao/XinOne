@@ -1,21 +1,80 @@
 import type { GameSceneData, RuntimeActions } from '@xinone/game-contracts';
 import { playOutcomeSound, playSharedBgm } from '@xinone/shared-assets';
 import Phaser from 'phaser';
-import { FloorHopperRun, WORLD } from '../domain/floor-hopper';
+import {
+  CLEAR_SECONDS,
+  FloorHopperRun,
+  scrollSpeedAt,
+  skyPhaseLabel,
+  skyTransitionAt,
+  WORLD,
+  type SkyPhase,
+} from '../domain/floor-hopper';
 import { FLOOR_HOPPER_GAME_SCENE } from './TitleScene';
 import { addHopperButton } from './ui';
 
 const PAUSE_BUTTON_GUARD_X = 1220;
 
+const SKY: Record<SkyPhase, { top: number; horizon: number; star: number; sun: number }> = {
+  morning: { top: 0x7ec8e3, horizon: 0xffd4a3, star: 0.05, sun: 0xffe08a },
+  noon: { top: 0x4aa7e0, horizon: 0xc8ecff, star: 0, sun: 0xfff4c2 },
+  evening: { top: 0x2a4a7c, horizon: 0xe07a3a, star: 0.2, sun: 0xff9a4a },
+  night: { top: 0x0b1a3a, horizon: 0x1a3355, star: 0.72, sun: 0xe8eefc },
+  'late-night': { top: 0x050814, horizon: 0x0c1220, star: 1, sun: 0xc5d0e8 },
+  dawn: { top: 0x3a2a68, horizon: 0xf0a070, star: 0.28, sun: 0xffc48a },
+};
+
+function formatLives(extraLives: number): string {
+  if (extraLives <= 0) return 'LIVES  ○';
+  if (extraLives <= 8) return `LIVES  ${'◆'.repeat(extraLives)}`;
+  return `LIVES  ◆×${extraLives}`;
+}
+
+function lerpChannel(from: number, to: number, t: number): number {
+  return Math.round(from + (to - from) * t);
+}
+
+function lerpColor(from: number, to: number, t: number): number {
+  const mix = Math.max(0, Math.min(1, t));
+  const r = lerpChannel((from >> 16) & 0xff, (to >> 16) & 0xff, mix);
+  const g = lerpChannel((from >> 8) & 0xff, (to >> 8) & 0xff, mix);
+  const b = lerpChannel(from & 0xff, to & 0xff, mix);
+  return (r << 16) | (g << 8) | b;
+}
+
+function hudColor(phase: SkyPhase): string {
+  return phase === 'morning' || phase === 'noon' ? '#14333a' : '#f8fafc';
+}
+
+interface KickPuff {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  life: number;
+  maxLife: number;
+  size: number;
+  color: number;
+  kind: 'dust' | 'scuff' | 'spark' | 'ring';
+  scroll: boolean;
+}
+
 export class FloorHopperGameScene extends Phaser.Scene {
   private runtime!: RuntimeActions;
   private run!: FloorHopperRun;
+  private skyGraphics!: Phaser.GameObjects.Graphics;
   private graphics!: Phaser.GameObjects.Graphics;
-  private distanceText!: Phaser.GameObjects.Text;
+  private stars: Phaser.GameObjects.Arc[] = [];
+  private scoreText!: Phaser.GameObjects.Text;
+  private detailText!: Phaser.GameObjects.Text;
+  private phaseText!: Phaser.GameObjects.Text;
   private jumpsText!: Phaser.GameObjects.Text;
+  private livesText!: Phaser.GameObjects.Text;
+  private respawnText!: Phaser.GameObjects.Text;
   private spaceKey?: Phaser.Input.Keyboard.Key;
   private pointerWasDown = false;
   private resultShown = false;
+  private puffs: KickPuff[] = [];
 
   constructor() {
     super(FLOOR_HOPPER_GAME_SCENE);
@@ -26,60 +85,144 @@ export class FloorHopperGameScene extends Phaser.Scene {
     this.run = new FloorHopperRun();
     this.pointerWasDown = false;
     this.resultShown = false;
+    this.stars = [];
+    this.puffs = [];
   }
 
   create(): void {
     playSharedBgm(this, 'active');
-    this.cameras.main.setBackgroundColor(0x07141c);
+    this.cameras.main.setBackgroundColor(0x7ec8e3);
+    this.skyGraphics = this.add.graphics().setDepth(-3);
     this.createStars();
     this.graphics = this.add.graphics();
-    this.distanceText = this.add.text(640, 28, '0 m', {
+    this.scoreText = this.add.text(640, 22, '0', {
       fontFamily: 'Arial Black',
       fontSize: '34px',
-      color: '#ffffff',
+      color: '#14333a',
+    }).setOrigin(0.5, 0);
+    this.phaseText = this.add.text(640, 58, 'MORNING', {
+      fontFamily: 'Arial Black',
+      fontSize: '16px',
+      color: '#14333a',
+    }).setOrigin(0.5, 0);
+    this.detailText = this.add.text(640, 80, '0 m   ·   0 coins', {
+      fontFamily: 'Arial',
+      fontSize: '18px',
+      color: '#14333a',
     }).setOrigin(0.5, 0);
     this.jumpsText = this.add.text(70, 36, '', {
       fontFamily: 'Arial Black',
       fontSize: '22px',
-      color: '#5eead4',
+      color: '#14333a',
     });
+    this.livesText = this.add.text(70, 68, '', {
+      fontFamily: 'Arial Black',
+      fontSize: '22px',
+      color: '#c47b16',
+    });
+    this.respawnText = this.add.text(640, 160, '', {
+      fontFamily: 'Arial Black',
+      fontSize: '28px',
+      color: '#c47b16',
+    }).setOrigin(0.5, 0);
     this.input.keyboard?.addCapture('SPACE');
     this.spaceKey = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
     this.render();
   }
 
   update(_time: number, deltaMilliseconds: number): void {
-    if (this.run.status === 'playing') this.readJumpInput();
+    this.readJumpInput();
     this.run.update(deltaMilliseconds / 1000);
+    this.spawnKickEffects();
+    this.updatePuffs(deltaMilliseconds / 1000);
     this.render();
-    if (this.run.status !== 'playing' && !this.resultShown) this.showResult();
+    if ((this.run.status === 'game-over' || this.run.status === 'cleared') && !this.resultShown) {
+      this.showResult();
+    }
   }
 
   private readJumpInput(): void {
     const pointer = this.input.activePointer;
     const pointerDown = pointer.leftButtonDown();
-    const clickedPlayfield = pointerDown && !this.pointerWasDown && pointer.x < PAUSE_BUTTON_GUARD_X;
+    const holdingPlayfield = pointerDown && pointer.x < PAUSE_BUTTON_GUARD_X;
+    const clickedPlayfield = holdingPlayfield && !this.pointerWasDown;
     this.pointerWasDown = pointerDown;
+    const spaceDown = this.spaceKey?.isDown === true;
     const pressedSpace = this.spaceKey !== undefined && Phaser.Input.Keyboard.JustDown(this.spaceKey);
+    if (this.run.status === 'respawning') {
+      this.run.setGlideHeld(false);
+      if (pressedSpace) this.run.dropIn();
+      return;
+    }
+    if (this.run.status !== 'playing') {
+      this.run.setGlideHeld(false);
+      return;
+    }
+    this.run.setGlideHeld(spaceDown || holdingPlayfield);
     if (clickedPlayfield || pressedSpace) this.run.jump();
   }
 
   private createStars(): void {
     for (let i = 0; i < 48; i += 1) {
-      this.add.circle(
+      const star = this.add.circle(
         Phaser.Math.Between(0, WORLD.width),
-        Phaser.Math.Between(0, WORLD.height),
+        Phaser.Math.Between(0, WORLD.height * 0.62),
         Phaser.Math.FloatBetween(1, 2.2),
         0xffffff,
-        Phaser.Math.FloatBetween(0.2, 0.7),
+        0,
       ).setDepth(-2);
+      star.setData('base', Phaser.Math.FloatBetween(0.25, 0.9));
+      this.stars.push(star);
     }
   }
 
   private render(): void {
     const snapshot = this.run.snapshot();
-    this.distanceText.setText(`${Math.floor(snapshot.distanceMeters)} m`);
-    this.jumpsText.setText(snapshot.jumpsRemaining === 2 ? 'JUMPS  ◆◆' : snapshot.jumpsRemaining === 1 ? 'JUMPS  ◆○' : 'JUMPS  ○○');
+    const transition = skyTransitionAt(snapshot.runSeconds);
+    const fromSky = SKY[transition.phase];
+    const toSky = SKY[transition.next];
+    const top = lerpColor(fromSky.top, toSky.top, transition.t);
+    const horizon = lerpColor(fromSky.horizon, toSky.horizon, transition.t);
+    const starAlpha = fromSky.star + (toSky.star - fromSky.star) * transition.t;
+    const sunColor = lerpColor(fromSky.sun, toSky.sun, transition.t);
+    const ink = hudColor(transition.t > 0.5 ? transition.next : transition.phase);
+
+    this.cameras.main.setBackgroundColor(top);
+    this.scoreText.setColor(ink);
+    this.phaseText.setColor(ink);
+    this.detailText.setColor(ink);
+    this.jumpsText.setColor(ink);
+    this.scoreText.setText(`${snapshot.score}`);
+    this.phaseText.setText(skyPhaseLabel(snapshot.skyPhase));
+    this.detailText.setText(`${Math.floor(snapshot.distanceMeters)} m   ·   ${snapshot.coinCount} coins`);
+    this.jumpsText.setText(
+      snapshot.gliding
+        ? 'JUMPS  ○○  GLIDE'
+        : snapshot.jumpsRemaining === 2 ? 'JUMPS  ◆◆' : snapshot.jumpsRemaining === 1 ? 'JUMPS  ◆○' : 'JUMPS  ○○',
+    );
+    this.livesText.setText(`${formatLives(snapshot.extraLives)}   ${snapshot.coinCount % WORLD.coinsPerLife}/${WORLD.coinsPerLife}`);
+    this.respawnText.setText(
+      snapshot.status === 'respawning'
+        ? `SPACE TO DROP   ${snapshot.respawnSeconds.toFixed(1)}s`
+        : '',
+    );
+
+    for (const star of this.stars) {
+      star.setAlpha(starAlpha * (star.getData('base') as number));
+    }
+
+    this.skyGraphics.clear();
+    this.skyGraphics.fillStyle(top, 1);
+    this.skyGraphics.fillRect(0, 0, WORLD.width, WORLD.height);
+    this.skyGraphics.fillStyle(horizon, 1);
+    this.skyGraphics.fillRect(0, 430, WORLD.width, 290);
+    const body = this.celestialBody(snapshot.runSeconds);
+    this.skyGraphics.fillStyle(sunColor, body.alpha);
+    this.skyGraphics.fillCircle(body.x, body.y, body.radius);
+    if (snapshot.skyPhase === 'night' || snapshot.skyPhase === 'late-night') {
+      this.skyGraphics.fillStyle(0x0b1a3a, 0.35);
+      this.skyGraphics.fillCircle(body.x - 10, body.y - 6, 16);
+    }
 
     const graphics = this.graphics.clear();
     for (const floor of snapshot.floors) {
@@ -88,42 +231,172 @@ export class FloorHopperGameScene extends Phaser.Scene {
       graphics.fillStyle(0x5eead4, 1);
       graphics.fillRect(floor.x, floor.y, floor.width, 4);
     }
+    for (const coin of snapshot.coins) {
+      graphics.fillStyle(0x111111, 1);
+      graphics.fillCircle(coin.x, coin.y, WORLD.coinRadius + 2.5);
+      graphics.fillStyle(0xffd166, 1);
+      graphics.fillCircle(coin.x, coin.y, WORLD.coinRadius);
+      graphics.fillStyle(0xfff3bf, 0.9);
+      graphics.fillCircle(coin.x - 3, coin.y - 3, 4);
+    }
 
     const bodyLeft = snapshot.playerX - WORLD.playerHalfWidth;
     const bodyTop = snapshot.playerY - WORLD.playerHeight;
-    graphics.fillStyle(0xf8fafc, 1);
+    const waiting = snapshot.status === 'respawning';
+    if (snapshot.gliding) {
+      graphics.fillStyle(0xff9f43, waiting ? 0.4 : 0.95);
+      graphics.fillTriangle(
+        bodyLeft - 6, bodyTop + 20,
+        bodyLeft + 8, bodyTop + 14,
+        bodyLeft - 2, bodyTop + 44,
+      );
+    }
+    graphics.fillStyle(0xf8fafc, waiting ? 0.45 : 1);
     graphics.fillRoundedRect(bodyLeft + 4, bodyTop + 16, WORLD.playerHalfWidth * 2 - 8, 28, 6);
-    graphics.fillStyle(0x5eead4, 1);
+    graphics.fillStyle(0x5eead4, waiting ? 0.55 : 1);
     graphics.fillCircle(snapshot.playerX, bodyTop + 12, 11);
+    this.drawPuffs(graphics);
+  }
+
+  private spawnKickEffects(): void {
+    for (const event of this.run.consumeEvents()) {
+      if (event === 'jump') this.spawnGroundKick();
+      if (event === 'double-jump') this.spawnAirKick();
+    }
+  }
+
+  private spawnGroundKick(): void {
+    const x = WORLD.playerX;
+    const y = this.run.playerY;
+    this.puffs.push({
+      x, y: y + 2, vx: 0, vy: 0,
+      life: 0.22, maxLife: 0.22, size: 18, color: 0x2c241c, kind: 'scuff', scroll: true,
+    });
+    for (let i = 0; i < 8; i += 1) {
+      const dir = i < 4 ? -1 : 1;
+      const life = 0.26 + Math.random() * 0.16;
+      this.puffs.push({
+        x: x + dir * (4 + Math.random() * 8),
+        y: y - Math.random() * 4,
+        vx: dir * (50 + Math.random() * 110),
+        vy: -30 - Math.random() * 70,
+        life,
+        maxLife: life,
+        size: 3.5 + Math.random() * 5,
+        color: i % 2 === 0 ? 0x4a3b2a : 0x6b5a45,
+        kind: 'dust',
+        scroll: true,
+      });
+    }
+  }
+
+  private spawnAirKick(): void {
+    const x = WORLD.playerX;
+    const y = this.run.playerY;
+    this.puffs.push({
+      x, y, vx: 0, vy: 12, life: 0.28, maxLife: 0.28, size: 10, color: 0x5eead4, kind: 'ring', scroll: false,
+    });
+    for (let i = 0; i < 7; i += 1) {
+      const angle = Math.PI * 0.2 + Math.random() * Math.PI * 0.6;
+      const speed = 90 + Math.random() * 140;
+      const life = 0.22 + Math.random() * 0.14;
+      this.puffs.push({
+        x,
+        y: y - 6,
+        vx: Math.cos(angle) * speed * (Math.random() < 0.5 ? -1 : 1) * 0.35,
+        vy: Math.sin(angle) * speed,
+        life,
+        maxLife: life,
+        size: 2.5 + Math.random() * 3,
+        color: i % 2 === 0 ? 0x5eead4 : 0xf8fafc,
+        kind: 'spark',
+        scroll: false,
+      });
+    }
+  }
+
+  private updatePuffs(deltaSeconds: number): void {
+    const dt = Math.min(deltaSeconds, 1 / 30);
+    const scroll = scrollSpeedAt(this.run.runSeconds);
+    for (const puff of this.puffs) {
+      puff.life -= dt;
+      puff.x += puff.vx * dt;
+      puff.y += puff.vy * dt;
+      if (puff.scroll) puff.x -= scroll * dt;
+      if (puff.kind === 'dust') puff.vy += 520 * dt;
+      if (puff.kind === 'spark') puff.vy += 280 * dt;
+    }
+    this.puffs = this.puffs.filter((puff) => puff.life > 0);
+  }
+
+  private drawPuffs(graphics: Phaser.GameObjects.Graphics): void {
+    for (const puff of this.puffs) {
+      const alpha = Math.max(0, puff.life / puff.maxLife);
+      if (puff.kind === 'scuff') {
+        graphics.fillStyle(puff.color, alpha * 0.55);
+        graphics.fillEllipse(puff.x, puff.y, puff.size * (1.4 - alpha * 0.4), puff.size * 0.28);
+        continue;
+      }
+      if (puff.kind === 'ring') {
+        graphics.lineStyle(3, puff.color, alpha);
+        graphics.strokeCircle(puff.x, puff.y, puff.size + (1 - alpha) * 22);
+        continue;
+      }
+      graphics.fillStyle(puff.color, puff.kind === 'dust' ? alpha * 0.85 : alpha);
+      graphics.fillCircle(puff.x, puff.y, puff.size * (0.55 + alpha * 0.45));
+    }
+  }
+
+  private celestialBody(runSeconds: number): { x: number; y: number; radius: number; alpha: number } {
+    const t = Math.max(0, Math.min(1, runSeconds / CLEAR_SECONDS));
+    return {
+      x: 180 + t * 920,
+      y: 150 + Math.sin(t * Math.PI) * -70,
+      radius: t > 0.45 && t < 0.85 ? 18 : 26,
+      alpha: 1,
+    };
   }
 
   private showResult(): void {
     this.resultShown = true;
-    playOutcomeSound(this, 'defeat');
-    const distance = Math.floor(this.run.distanceMeters);
+    const snapshot = this.run.snapshot();
+    const win = snapshot.status === 'cleared';
+    playOutcomeSound(this, win ? 'victory' : 'defeat');
     this.runtime.recordResult({
       gameId: 'floor-hopper',
-      scoreType: 'distance',
-      value: distance,
-      unit: 'm',
+      scoreType: 'score',
+      value: snapshot.score,
+      unit: '点',
       winCondition: 'higher',
-      outcome: 'lose',
+      outcome: win ? 'win' : 'lose',
       playedAt: new Date().toISOString(),
     });
-    this.add.rectangle(640, 360, 560, 260, 0x071018, 0.94).setStrokeStyle(4, 0x5eead4);
-    this.add.text(640, 280, 'GAME OVER', {
+    this.add.rectangle(640, 360, 560, win ? 310 : 280, 0x071018, 0.94).setStrokeStyle(4, win ? 0xffd166 : 0x5eead4);
+    this.add.text(640, win ? 252 : 268, win ? 'CLEAR' : 'GAME OVER', {
       fontFamily: 'Arial Black',
       fontSize: '48px',
-      color: '#5eead4',
+      color: win ? '#ffd166' : '#5eead4',
     }).setOrigin(0.5);
-    this.add.text(640, 340, `${distance} m`, {
+    this.add.text(640, win ? 310 : 328, `${snapshot.score}`, {
       fontFamily: 'Arial Black',
-      fontSize: '32px',
-      color: '#ffffff',
+      fontSize: '36px',
+      color: '#ffd166',
     }).setOrigin(0.5);
-    addHopperButton(this, 520, 430, 'Retry', () => {
+    if (win) {
+      this.add.text(640, 352, `+${WORLD.clearBonus} CLEAR`, {
+        fontFamily: 'Arial Black',
+        fontSize: '22px',
+        color: '#ffd166',
+      }).setOrigin(0.5);
+    }
+    this.add.text(640, win ? 388 : 368, `${Math.floor(snapshot.distanceMeters)} m   ·   ${snapshot.coinCount} coins`, {
+      fontFamily: 'Arial',
+      fontSize: '20px',
+      color: '#c5d6e2',
+    }).setOrigin(0.5);
+    addHopperButton(this, 520, 450, 'Retry', () => {
       this.scene.restart({ runtime: this.runtime });
     }, 200);
-    addHopperButton(this, 760, 430, 'Launcher', () => this.runtime.returnToLauncher(), 200);
+    addHopperButton(this, 760, 450, 'Launcher', () => this.runtime.returnToLauncher(), 200);
   }
 }

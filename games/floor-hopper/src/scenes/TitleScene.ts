@@ -25,23 +25,33 @@ export class FloorHopperTitleScene extends Phaser.Scene {
       fontSize: '54px',
       color: '#5eead4',
     }).setOrigin(0.5);
-    this.add.text(640, 188, 'Floors drift left. Stay on them as long as you can.', {
-      fontFamily: 'Arial',
-      fontSize: '23px',
-      color: '#c5d6e2',
-    }).setOrigin(0.5);
-    this.add.text(640, 236, 'Jump: Space or click', {
+    this.add.text(640, 188, 'Ride morning to dawn. The latter half actually gets fast.', {
       fontFamily: 'Arial',
       fontSize: '22px',
+      color: '#c5d6e2',
+    }).setOrigin(0.5);
+    this.add.text(640, 230, 'Jump: Space or click. After two jumps, hold Space to glide.', {
+      fontFamily: 'Arial',
+      fontSize: '20px',
       color: '#7ef0d8',
     }).setOrigin(0.5);
-    this.add.text(640, 274, 'Double jump once in the air to recover from gaps.', {
+    this.add.text(640, 268, 'Double jump once in the air to recover from gaps.', {
       fontFamily: 'Arial',
       fontSize: '20px',
       color: '#8fb0c2',
     }).setOrigin(0.5);
+    this.add.text(640, 306, 'Coins are 100 points. 10 coins grant an extra life.', {
+      fontFamily: 'Arial',
+      fontSize: '20px',
+      color: '#ffd166',
+    }).setOrigin(0.5);
+    this.add.text(640, 344, 'Two extra lives. Survive until dawn to CLEAR.', {
+      fontFamily: 'Arial',
+      fontSize: '20px',
+      color: '#c5d6e2',
+    }).setOrigin(0.5);
 
-    addHopperButton(this, 640, 380, 'Start', () => {
+    addHopperButton(this, 640, 430, 'Start', () => {
       this.scene.start(FLOOR_HOPPER_GAME_SCENE, { runtime: this.runtime });
     }, 260);
 
