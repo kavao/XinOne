@@ -21,7 +21,7 @@ export const PADDLE = {
   height: 16,
   y: FIELD.bottom - 36,
   extendedWidth: 165,
-  extendDuration: 8,
+  extendDuration: 14,
 } as const;
 
 export const BALL = {
@@ -29,6 +29,8 @@ export const BALL = {
   baseSpeed: 360,
   maxSpeed: 760,
   maxStep: 8,
+  sliceSpeed: 480,
+  spinKick: 1.1,
 } as const;
 
 export const ITEM = {
@@ -36,7 +38,7 @@ export const ITEM = {
   fallSpeed: 160,
   dropChance: 0.18,
   wallHitsPerItem: 20,
-  pierceDuration: 6,
+  pierceDuration: 12,
   laserDuration: 8,
   laserInterval: 0.4,
   laserSpeed: 520,
@@ -65,6 +67,11 @@ export interface Ball {
   y: number;
   vx: number;
   vy: number;
+  spin?: number;
+}
+
+export interface BreakoutOptions {
+  sliceEnabled?: boolean;
 }
 
 export type ItemType = 'multi-ball' | 'paddle-extend' | 'pierce' | 'laser';
@@ -115,6 +122,7 @@ export interface BreakoutSnapshot {
   laserRemaining: number;
   paddleExtendRemaining: number;
   bricksRemaining: number;
+  sliceEnabled: boolean;
 }
 
 export class BreakoutMatch {
@@ -129,10 +137,13 @@ export class BreakoutMatch {
   pierceRemaining = 0;
   laserRemaining = 0;
   paddleExtendRemaining = 0;
+  readonly sliceEnabled: boolean;
   private laserCooldown = 0;
+  private paddleVx = 0;
   private events: BreakoutEvent[] = [];
 
-  constructor(readonly stage: StageDefinition) {
+  constructor(readonly stage: StageDefinition, options: BreakoutOptions = {}) {
+    this.sliceEnabled = options.sliceEnabled !== false;
     this.bricks = buildBricks(stage);
     this.spawnBall();
   }
@@ -141,7 +152,7 @@ export class BreakoutMatch {
     if (this.status !== 'playing') return;
     const delta = Math.min(deltaSeconds, 1 / 30);
 
-    this.movePaddle(paddleTargetX);
+    this.movePaddle(paddleTargetX, delta);
     this.updateTimers(delta);
     this.updateLasers(delta);
     this.updateItems(delta);
@@ -163,6 +174,7 @@ export class BreakoutMatch {
       laserRemaining: this.laserRemaining,
       paddleExtendRemaining: this.paddleExtendRemaining,
       bricksRemaining: this.bricks.filter((brick) => brick.kind === 'normal' && brick.alive).length,
+      sliceEnabled: this.sliceEnabled,
     };
   }
 
@@ -170,9 +182,11 @@ export class BreakoutMatch {
     return this.events.splice(0);
   }
 
-  private movePaddle(targetX: number): void {
+  private movePaddle(targetX: number, delta: number): void {
     const halfWidth = this.paddleWidth / 2;
+    const previousX = this.paddleX;
     this.paddleX = clamp(targetX, FIELD.left + halfWidth, FIELD.right - halfWidth);
+    this.paddleVx = delta > 0 ? (this.paddleX - previousX) / delta : 0;
   }
 
   private updateTimers(delta: number): void {
@@ -297,6 +311,7 @@ export class BreakoutMatch {
     ball.vx = Math.sin(angle) * speed;
     ball.vy = -Math.cos(angle) * speed;
     ball.y = paddleTop - BALL.radius;
+    ball.spin = this.sliceEnabled ? clamp(this.paddleVx / BALL.sliceSpeed, -1, 1) : 0;
     this.events.push('paddle-hit');
   }
 
@@ -343,10 +358,28 @@ export class BreakoutMatch {
     if (overlapX < overlapY) {
       ball.vx = ball.x < brick.x ? -Math.abs(ball.vx) : Math.abs(ball.vx);
       ball.x = brick.x + (ball.x < brick.x ? -(halfW + BALL.radius) : halfW + BALL.radius);
+      this.applySpinToBounce(ball, 'x');
     } else {
       ball.vy = ball.y < brick.y ? -Math.abs(ball.vy) : Math.abs(ball.vy);
       ball.y = brick.y + (ball.y < brick.y ? -(halfH + BALL.radius) : halfH + BALL.radius);
+      this.applySpinToBounce(ball, 'y');
     }
+  }
+
+  private applySpinToBounce(ball: Ball, axis: 'x' | 'y'): void {
+    const spin = ball.spin ?? 0;
+    if (!this.sliceEnabled || spin === 0) {
+      ball.spin = 0;
+      return;
+    }
+    const speed = Math.hypot(ball.vx, ball.vy);
+    const kick = spin * BALL.spinKick * speed;
+    if (axis === 'y') ball.vx += kick;
+    else ball.vy += kick;
+    const nextSpeed = Math.hypot(ball.vx, ball.vy) || 1;
+    ball.vx = (ball.vx / nextSpeed) * speed;
+    ball.vy = (ball.vy / nextSpeed) * speed;
+    ball.spin = 0;
   }
 
   private brickContainsPoint(brick: Brick, x: number, y: number): boolean {
@@ -414,6 +447,7 @@ export class BreakoutMatch {
       y: PADDLE.y - BALL.radius - 1,
       vx: Math.cos(angle) * BALL.baseSpeed,
       vy: Math.sin(angle) * BALL.baseSpeed,
+      spin: 0,
     }];
   }
 }
@@ -448,6 +482,7 @@ function rotateBall(ball: Ball, angle: number): Ball {
     y: ball.y,
     vx: Math.cos(newAngle) * speed,
     vy: Math.sin(newAngle) * speed,
+    spin: ball.spin ?? 0,
   };
 }
 

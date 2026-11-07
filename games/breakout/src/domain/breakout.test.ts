@@ -160,6 +160,7 @@ describe('BreakoutMatch', () => {
 
     match.update(1 / 60, match.paddleX);
     expect(match.paddleWidth).toBe(PADDLE.extendedWidth);
+    expect(match.paddleExtendRemaining).toBeGreaterThan(PADDLE.extendDuration - 0.05);
 
     match.paddleExtendRemaining = 1 / 120;
     match.update(1 / 60, match.paddleX);
@@ -285,5 +286,53 @@ describe('BreakoutMatch', () => {
     expect(rightWall.hits).toBe(1);
     expect(match.items.length).toBe(0);
     expect(match.consumeEvents()).not.toContain('item-drop');
+  });
+
+  it('enables slice by default and stores paddle swipe as spin', () => {
+    const match = new BreakoutMatch(FAR_BRICK_STAGE);
+    expect(match.sliceEnabled).toBe(true);
+    match.balls[0] = {
+      x: match.paddleX,
+      y: PADDLE.y - BALL.radius - 1,
+      vx: 0,
+      vy: 200,
+    };
+
+    match.update(1 / 60, match.paddleX + 30);
+
+    expect(match.balls[0].spin).toBeGreaterThan(0);
+  });
+
+  it('deflects the next brick bounce with stored spin and then clears it', () => {
+    const match = new BreakoutMatch(WALL_AND_NORMAL_STAGE);
+    const wallBrick = match.bricks.find((brick) => brick.kind === 'wall')!;
+    match.balls[0] = {
+      x: wallBrick.x,
+      y: wallBrick.y - BRICK.height / 2 - BALL.radius - 2,
+      vx: 0,
+      vy: 400,
+      spin: 1,
+    };
+
+    match.update(1 / 60, match.paddleX);
+
+    expect(match.balls[0].spin).toBe(0);
+    expect(match.balls[0].vx).toBeGreaterThan(200);
+    expect(match.consumeEvents()).toContain('wall-hit');
+  });
+
+  it('does not apply slice when the option is disabled', () => {
+    const match = new BreakoutMatch(FAR_BRICK_STAGE, { sliceEnabled: false });
+    match.balls[0] = {
+      x: match.paddleX,
+      y: PADDLE.y - BALL.radius - 1,
+      vx: 0,
+      vy: 200,
+    };
+
+    match.update(1 / 60, match.paddleX + 30);
+
+    expect(match.sliceEnabled).toBe(false);
+    expect(match.balls[0].spin ?? 0).toBe(0);
   });
 });

@@ -9,6 +9,9 @@ export const BREAKOUT_GAME_SCENE = 'breakout:game';
 
 export class BreakoutTitleScene extends Phaser.Scene {
   private runtime!: RuntimeActions;
+  private sliceEnabled = true;
+  private sliceLabel?: Phaser.GameObjects.Text;
+  private sliceBackground?: Phaser.GameObjects.Rectangle;
 
   constructor() {
     super(BREAKOUT_TITLE_SCENE);
@@ -31,15 +34,14 @@ export class BreakoutTitleScene extends Phaser.Scene {
       fontSize: '22px',
       color: '#d7c6eb',
     }).setOrigin(0.5);
-    this.add.text(640, 186, 'Stage 4 drops power-ups. Stage 5 is a giant gem to shatter.', {
+    this.add.text(640, 186, 'Swipe the paddle to slice. Spin changes the next brick bounce.', {
       fontFamily: 'Arial',
       fontSize: '18px',
       color: '#9fd8ff',
     }).setOrigin(0.5);
 
-    addBreakoutButton(this, 640, 268, 'Start', () => {
-      this.scene.start(BREAKOUT_GAME_SCENE, { runtime: this.runtime, stageNumber: 1 });
-    }, 260);
+    addBreakoutButton(this, 500, 268, 'Start', () => this.startGame(1), 220);
+    this.addSliceToggle(790, 268);
 
     this.add.text(640, 340, 'STAGE SELECT', {
       fontFamily: 'Arial Black',
@@ -77,7 +79,37 @@ export class BreakoutTitleScene extends Phaser.Scene {
     background.on('pointerout', () => background.setFillStyle(0x1c2440));
     background.on('pointerdown', () => {
       playClickSound(this);
-      this.scene.start(BREAKOUT_GAME_SCENE, { runtime: this.runtime, stageNumber });
+      this.startGame(stageNumber);
+    });
+  }
+
+  private addSliceToggle(x: number, y: number): void {
+    this.sliceBackground = this.add.rectangle(x, y, 240, 54, 0x1c2440).setStrokeStyle(2, 0xff70d9).setInteractive({ useHandCursor: true });
+    this.sliceLabel = this.add.text(x, y, '', {
+      fontFamily: 'Arial',
+      fontSize: '22px',
+      color: '#ffffff',
+    }).setOrigin(0.5);
+    this.refreshSliceToggle();
+    this.sliceBackground.on('pointerover', () => this.sliceBackground?.setFillStyle(0x3a2450));
+    this.sliceBackground.on('pointerout', () => this.sliceBackground?.setFillStyle(0x1c2440));
+    this.sliceBackground.on('pointerdown', () => {
+      playClickSound(this);
+      this.sliceEnabled = !this.sliceEnabled;
+      this.refreshSliceToggle();
+    });
+  }
+
+  private refreshSliceToggle(): void {
+    this.sliceLabel?.setText(this.sliceEnabled ? 'SLICE  ON' : 'SLICE  OFF');
+    this.sliceBackground?.setStrokeStyle(2, this.sliceEnabled ? 0xff70d9 : 0x6b7390);
+  }
+
+  private startGame(stageNumber: number): void {
+    this.scene.start(BREAKOUT_GAME_SCENE, {
+      runtime: this.runtime,
+      stageNumber,
+      sliceEnabled: this.sliceEnabled,
     });
   }
 }

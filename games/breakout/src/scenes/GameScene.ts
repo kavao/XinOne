@@ -19,6 +19,7 @@ import { addBreakoutButton } from './ui';
 
 interface BreakoutGameData extends GameSceneData {
   stageNumber: number;
+  sliceEnabled?: boolean;
 }
 
 const STAGE_BGM_ROTATION: SharedBgmTrack[] = ['active', 'upbeat', 'thoughtful'];
@@ -62,6 +63,7 @@ export class BreakoutGameScene extends Phaser.Scene {
   private resultShown = false;
   private missLockSeconds = 0;
   private pendingGameOver = false;
+  private sliceEnabled = true;
 
   constructor() {
     super(BREAKOUT_GAME_SCENE);
@@ -70,7 +72,8 @@ export class BreakoutGameScene extends Phaser.Scene {
   init(data: BreakoutGameData): void {
     this.runtime = data.runtime;
     this.stageNumber = data.stageNumber;
-    this.match = new BreakoutMatch(STAGES[this.stageNumber - 1]);
+    this.sliceEnabled = data.sliceEnabled !== false;
+    this.match = new BreakoutMatch(STAGES[this.stageNumber - 1], { sliceEnabled: this.sliceEnabled });
     this.pointerHasMoved = false;
     this.resultShown = false;
     this.missLockSeconds = 0;
@@ -99,11 +102,11 @@ export class BreakoutGameScene extends Phaser.Scene {
       fontSize: '22px',
       color: '#ffd166',
     }).setOrigin(0.5, 0);
-    this.livesText = this.add.text(960, 14, '', {
+    this.livesText = this.add.text(FIELD.left, 14, '', {
       fontFamily: 'Arial',
       fontSize: '18px',
       color: '#d7c6eb',
-    }).setOrigin(1, 0);
+    }).setOrigin(0, 0);
 
     addBreakoutButton(this, 1180, 690, 'Launcher', () => this.runtime.returnToLauncher(), 170);
 
@@ -348,7 +351,8 @@ export class BreakoutGameScene extends Phaser.Scene {
     );
 
     for (const ball of snapshot.balls) {
-      graphics.fillStyle(snapshot.pierceRemaining > 0 ? 0xffd166 : 0xffffff, 1);
+      const spinning = Math.abs(ball.spin ?? 0) > 0.08;
+      graphics.fillStyle(snapshot.pierceRemaining > 0 ? 0xffd166 : spinning ? 0xff70d9 : 0xffffff, 1);
       graphics.fillCircle(ball.x, ball.y, BALL.radius);
     }
 
@@ -368,7 +372,7 @@ export class BreakoutGameScene extends Phaser.Scene {
         color: '#65d8ff',
       }).setOrigin(0.5);
       addBreakoutButton(this, 640, 400, 'Next Stage', () => {
-        this.scene.restart({ runtime: this.runtime, stageNumber: this.stageNumber + 1 });
+        this.scene.restart({ runtime: this.runtime, stageNumber: this.stageNumber + 1, sliceEnabled: this.sliceEnabled });
       }, 240);
       return;
     }
@@ -392,7 +396,7 @@ export class BreakoutGameScene extends Phaser.Scene {
       }).setOrigin(0.5);
       this.renderFinaleArt();
       addBreakoutButton(this, 520, 580, 'Play Again', () => {
-        this.scene.restart({ runtime: this.runtime, stageNumber: 1 });
+        this.scene.restart({ runtime: this.runtime, stageNumber: 1, sliceEnabled: this.sliceEnabled });
       }, 220);
       addBreakoutButton(this, 760, 580, 'Launcher', () => this.runtime.returnToLauncher(), 220);
       return;
@@ -415,7 +419,7 @@ export class BreakoutGameScene extends Phaser.Scene {
       color: '#ff5f4d',
     }).setOrigin(0.5);
     addBreakoutButton(this, 520, 400, 'Retry', () => {
-      this.scene.restart({ runtime: this.runtime, stageNumber: this.stageNumber });
+      this.scene.restart({ runtime: this.runtime, stageNumber: this.stageNumber, sliceEnabled: this.sliceEnabled });
     }, 220);
     addBreakoutButton(this, 760, 400, 'Launcher', () => this.runtime.returnToLauncher(), 220);
   }
