@@ -73,7 +73,8 @@ export class SystemOverlayScene extends Phaser.Scene {
       else button.disableInteractive();
     }
     for (const label of ['RESUME', 'TITLE', 'LAUNCHER']) {
-      this.children.getByName(`${label}:label`)?.setVisible(visible);
+      const caption = this.children.getByName(`${label}:label`) as Phaser.GameObjects.Text | undefined;
+      caption?.setVisible(visible);
     }
   }
 

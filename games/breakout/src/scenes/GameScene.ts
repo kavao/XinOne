@@ -91,7 +91,7 @@ export class BreakoutGameScene extends Phaser.Scene {
     this.pointerHasMoved = false;
     this.resultShown = false;
     this.missLockSeconds = 0;
-    this.startHoldSeconds = import.meta.env.DEV ? 1.5 : 0;
+    this.startHoldSeconds = (import.meta as { env?: { DEV?: boolean } }).env?.DEV ? 1.5 : 0;
     this.pendingGameOver = false;
   }
 
