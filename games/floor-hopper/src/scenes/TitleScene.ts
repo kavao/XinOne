@@ -30,12 +30,12 @@ export class FloorHopperTitleScene extends Phaser.Scene {
       fontSize: '22px',
       color: '#c5d6e2',
     }).setOrigin(0.5);
-    this.add.text(640, 230, 'Jump: Space or click. After two jumps, hold Space to glide.', {
+    this.add.text(640, 230, 'Jump: Space or click. Hold Space while falling to glide.', {
       fontFamily: 'Arial',
       fontSize: '20px',
       color: '#7ef0d8',
     }).setOrigin(0.5);
-    this.add.text(640, 268, 'Double jump once in the air to recover from gaps.', {
+    this.add.text(640, 268, 'Double jump once in the air. The cape only slows a descent.', {
       fontFamily: 'Arial',
       fontSize: '20px',
       color: '#8fb0c2',

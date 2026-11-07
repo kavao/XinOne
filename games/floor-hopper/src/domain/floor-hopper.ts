@@ -273,7 +273,7 @@ export class FloorHopperRun {
   }
 
   private isGliding(): boolean {
-    return this.status === 'playing' && this.glideHeld && !this.grounded && this.jumpsRemaining <= 0;
+    return this.status === 'playing' && this.glideHeld && !this.grounded && this.playerVy > 0;
   }
 
   private handleDown(): void {

@@ -10,6 +10,7 @@ import {
   WORLD,
   type SkyPhase,
 } from '../domain/floor-hopper';
+import { FLOOR_HOPPER_AUDIO } from '../audio-manifest';
 import { FLOOR_HOPPER_GAME_SCENE } from './TitleScene';
 import { addHopperButton } from './ui';
 
@@ -55,7 +56,7 @@ interface KickPuff {
   maxLife: number;
   size: number;
   color: number;
-  kind: 'dust' | 'scuff' | 'spark' | 'ring';
+  kind: 'dust' | 'scuff' | 'spark' | 'ring' | 'glint';
   scroll: boolean;
 }
 
@@ -91,6 +92,11 @@ export class FloorHopperGameScene extends Phaser.Scene {
     this.pendingGameOver = false;
     this.stars = [];
     this.puffs = [];
+  }
+
+  preload(): void {
+    const jump = FLOOR_HOPPER_AUDIO.jump;
+    if (!this.cache.audio.exists(jump.key)) this.load.audio(jump.key, jump.url);
   }
 
   create(): void {
@@ -205,11 +211,8 @@ export class FloorHopperGameScene extends Phaser.Scene {
     this.scoreText.setText(`${snapshot.score}`);
     this.phaseText.setText(skyPhaseLabel(snapshot.skyPhase));
     this.detailText.setText(`${Math.floor(snapshot.distanceMeters)} m   ·   ${snapshot.coinCount} coins`);
-    this.jumpsText.setText(
-      snapshot.gliding
-        ? 'JUMPS  ○○  GLIDE'
-        : snapshot.jumpsRemaining === 2 ? 'JUMPS  ◆◆' : snapshot.jumpsRemaining === 1 ? 'JUMPS  ◆○' : 'JUMPS  ○○',
-    );
+    const jumpMarks = snapshot.jumpsRemaining === 2 ? '◆◆' : snapshot.jumpsRemaining === 1 ? '◆○' : '○○';
+    this.jumpsText.setText(snapshot.gliding ? `JUMPS  ${jumpMarks}  GLIDE` : `JUMPS  ${jumpMarks}`);
     this.livesText.setText(`${formatLives(snapshot.extraLives)}   ${snapshot.coinCount % WORLD.coinsPerLife}/${WORLD.coinsPerLife}`);
     this.respawnText.setText(
       snapshot.status === 'respawning'
@@ -269,11 +272,66 @@ export class FloorHopperGameScene extends Phaser.Scene {
   }
 
   private spawnKickEffects(): void {
-    for (const event of this.run.consumeEvents()) {
-      if (event === 'jump') this.spawnGroundKick();
-      if (event === 'double-jump') this.spawnAirKick();
+    const events = this.run.consumeEvents();
+    const gainedLife = events.includes('extra-life');
+    for (const event of events) {
+      if (event === 'jump') {
+        this.playJumpSound(false);
+        this.spawnGroundKick();
+      }
+      if (event === 'double-jump') {
+        this.playJumpSound(true);
+        this.spawnAirKick();
+      }
+      if (event === 'coin' && !gainedLife) this.spawnCoinSparkle(false);
+      if (event === 'extra-life') this.spawnCoinSparkle(true);
       if (event === 'downed') this.playFallSting(false);
       if (event === 'game-over') this.playFallSting(true);
+    }
+  }
+
+  private spawnCoinSparkle(lifeBonus: boolean): void {
+    const x = WORLD.playerX;
+    const y = this.run.playerY - WORLD.playerHeight * 0.45;
+    const colors = lifeBonus
+      ? [0x5eead4, 0x7ef0d8, 0x65d8ff, 0xf8fafc]
+      : [0xffd166, 0xfff3bf, 0xffae42];
+    this.puffs.push({
+      x, y, vx: 0, vy: -8,
+      life: lifeBonus ? 0.34 : 0.22,
+      maxLife: lifeBonus ? 0.34 : 0.22,
+      size: lifeBonus ? 7 : 4,
+      color: lifeBonus ? 0x5eead4 : 0xffd166,
+      kind: 'ring',
+      scroll: false,
+    });
+    const count = lifeBonus ? 14 : 8;
+    for (let i = 0; i < count; i += 1) {
+      const angle = (Math.PI * 2 * i) / count + Math.random() * 0.4;
+      const speed = (lifeBonus ? 90 : 55) + Math.random() * (lifeBonus ? 140 : 90);
+      const life = (lifeBonus ? 0.28 : 0.18) + Math.random() * 0.12;
+      this.puffs.push({
+        x,
+        y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - 30,
+        life,
+        maxLife: life,
+        size: (lifeBonus ? 4 : 3.2) + Math.random() * 2.2,
+        color: colors[i % colors.length],
+        kind: 'glint',
+        scroll: false,
+      });
+    }
+    if (lifeBonus) {
+      this.livesText.setColor('#5eead4');
+      this.tweens.add({
+        targets: this.livesText,
+        scale: 1.25,
+        duration: 140,
+        yoyo: true,
+        onComplete: () => this.livesText.setColor('#c47b16'),
+      });
     }
   }
 
@@ -368,6 +426,12 @@ export class FloorHopperGameScene extends Phaser.Scene {
     }
   }
 
+  private playJumpSound(air: boolean): void {
+    const audio = FLOOR_HOPPER_AUDIO.jump;
+    if (!this.cache.audio.exists(audio.key)) return;
+    this.sound.play(audio.key, { volume: air ? 0.18 : audio.volume, rate: air ? 1.18 : 1 });
+  }
+
   private spawnGroundKick(): void {
     const x = WORLD.playerX;
     const y = this.run.playerY;
@@ -428,6 +492,7 @@ export class FloorHopperGameScene extends Phaser.Scene {
       if (puff.scroll) puff.x -= scroll * dt;
       if (puff.kind === 'dust') puff.vy += 520 * dt;
       if (puff.kind === 'spark') puff.vy += 280 * dt;
+      if (puff.kind === 'glint') puff.vy += 40 * dt;
     }
     this.puffs = this.puffs.filter((puff) => puff.life > 0);
   }
@@ -441,12 +506,20 @@ export class FloorHopperGameScene extends Phaser.Scene {
         continue;
       }
       if (puff.kind === 'ring') {
+        const radius = puff.size + (1 - alpha) * 22;
+        graphics.lineStyle(5, 0x111111, alpha);
+        graphics.strokeCircle(puff.x, puff.y, radius);
         graphics.lineStyle(3, puff.color, alpha);
-        graphics.strokeCircle(puff.x, puff.y, puff.size + (1 - alpha) * 22);
+        graphics.strokeCircle(puff.x, puff.y, radius);
         continue;
       }
+      const radius = puff.size * (puff.kind === 'glint' ? 0.55 + alpha * 0.55 : 0.55 + alpha * 0.45);
+      if (puff.kind === 'glint') {
+        graphics.fillStyle(0x111111, alpha);
+        graphics.fillCircle(puff.x, puff.y, radius + 2);
+      }
       graphics.fillStyle(puff.color, puff.kind === 'dust' ? alpha * 0.85 : alpha);
-      graphics.fillCircle(puff.x, puff.y, puff.size * (0.55 + alpha * 0.45));
+      graphics.fillCircle(puff.x, puff.y, radius);
     }
   }
 

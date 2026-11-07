@@ -31,7 +31,7 @@ describe('FloorHopperRun', () => {
     expect(run.jumpsRemaining).toBe(0);
   });
 
-  it('glides after both jumps to slow a fall', () => {
+  it('glides while falling even after only the first jump', () => {
     const falling = new FloorHopperRun(() => 0.5);
     const gliding = new FloorHopperRun(() => 0.5);
     for (const run of [falling, gliding]) {
@@ -39,7 +39,7 @@ describe('FloorHopperRun', () => {
       run.playerY = 240;
       run.playerVy = 360;
       run.grounded = false;
-      run.jumpsRemaining = 0;
+      run.jumpsRemaining = 1;
     }
     gliding.setGlideHeld(true);
 
@@ -53,6 +53,26 @@ describe('FloorHopperRun', () => {
     expect(gliding.playerVy).toBeLessThanOrEqual(WORLD.glideFallCap);
     expect(falling.playerVy).toBeGreaterThan(WORLD.glideFallCap);
     expect(gliding.consumeEvents()).toContain('glide');
+  });
+
+  it('does not glide while rising so a held cape cannot add jump height', () => {
+    const rising = new FloorHopperRun(() => 0.5);
+    const holding = new FloorHopperRun(() => 0.5);
+    for (const run of [rising, holding]) {
+      run.floors = [{ x: 0, y: 700, width: 800 }];
+      run.playerY = 400;
+      run.playerVy = -600;
+      run.grounded = false;
+      run.jumpsRemaining = 0;
+    }
+    holding.setGlideHeld(true);
+
+    rising.update(1 / 60);
+    holding.update(1 / 60);
+
+    expect(holding.snapshot().gliding).toBe(false);
+    expect(holding.playerVy).toBeCloseTo(rising.playerVy);
+    expect(holding.playerY).toBeCloseTo(rising.playerY);
   });
 
   it('ramps slow to fast inside every 30-second sky phase, and the latter half is actually fast', () => {
