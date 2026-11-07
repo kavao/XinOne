@@ -60,6 +60,8 @@ export class BreakoutGameScene extends Phaser.Scene {
   private brickParticles!: Phaser.GameObjects.Particles.ParticleEmitter;
   private pointerHasMoved = false;
   private resultShown = false;
+  private missLockSeconds = 0;
+  private pendingGameOver = false;
 
   constructor() {
     super(BREAKOUT_GAME_SCENE);
@@ -71,6 +73,8 @@ export class BreakoutGameScene extends Phaser.Scene {
     this.match = new BreakoutMatch(STAGES[this.stageNumber - 1]);
     this.pointerHasMoved = false;
     this.resultShown = false;
+    this.missLockSeconds = 0;
+    this.pendingGameOver = false;
   }
 
   preload(): void {
@@ -111,12 +115,20 @@ export class BreakoutGameScene extends Phaser.Scene {
   }
 
   update(_time: number, deltaMilliseconds: number): void {
+    const deltaSeconds = deltaMilliseconds / 1000;
+    if (this.missLockSeconds > 0) {
+      this.missLockSeconds -= deltaSeconds;
+      if (this.missLockSeconds <= 0 && this.pendingGameOver) this.showResult();
+      this.render();
+      return;
+    }
     if (this.match.status !== 'playing') return;
 
     const target = this.pointerHasMoved ? this.input.activePointer.worldX : this.match.paddleX;
     const aliveBefore = this.match.bricks.map((brick) => brick.alive);
+    const ballsBefore = this.match.balls.map((ball) => ({ ...ball }));
 
-    this.match.update(deltaMilliseconds / 1000, target);
+    this.match.update(deltaSeconds, target);
 
     this.match.bricks.forEach((brick, index) => {
       if (aliveBefore[index] && !brick.alive) this.spawnBrickParticles(brick.x, brick.y, brick.kind);
@@ -137,9 +149,16 @@ export class BreakoutGameScene extends Phaser.Scene {
         case 'item-collect':
           playClickSound(this);
           break;
+        case 'ball-lost': {
+          const fallen = ballsBefore.reduce((lowest, ball) => (ball.y > lowest.y ? ball : lowest), ballsBefore[0]);
+          this.playMissSting(fallen ?? { x: this.match.paddleX, y: FIELD.bottom });
+          break;
+        }
+        case 'game-over':
+          this.pendingGameOver = true;
+          break;
         case 'stage-clear':
         case 'game-clear':
-        case 'game-over':
           this.showResult();
           break;
         default:
@@ -202,6 +221,77 @@ export class BreakoutGameScene extends Phaser.Scene {
   private playBallHitSound(): void {
     const audio = BREAKOUT_AUDIO.ballHit;
     if (this.cache.audio.exists(audio.key)) this.sound.play(audio.key, { volume: audio.volume });
+  }
+
+  private playMissSting(fallen: { x: number; y: number }): void {
+    this.missLockSeconds = this.match.status === 'game-over' ? 0.95 : 0.7;
+    this.cameras.main.shake(320, 0.014);
+    this.cameras.main.flash(220, 210, 30, 50);
+    const dropX = Phaser.Math.Clamp(fallen.x, FIELD.left + 16, FIELD.right - 16);
+    const dropY = Math.min(fallen.y, FIELD.bottom - 6);
+
+    const wash = this.add.rectangle(FIELD.left + FIELD.size / 2, FIELD.top + FIELD.size / 2, FIELD.size, FIELD.size, 0xff2a3a, 0.42).setDepth(8);
+    this.tweens.add({
+      targets: wash,
+      alpha: 0,
+      duration: 560,
+      ease: 'Cubic.easeOut',
+      onComplete: () => wash.destroy(),
+    });
+
+    const ghost = this.add.ellipse(dropX, dropY, BALL.radius * 2, BALL.radius * 2, 0xffffff, 1).setDepth(9);
+    this.tweens.add({
+      targets: ghost,
+      y: FIELD.bottom + 46,
+      scaleX: 0.35,
+      scaleY: 1.9,
+      alpha: 0,
+      duration: 420,
+      ease: 'Cubic.easeIn',
+      onComplete: () => ghost.destroy(),
+    });
+
+    this.brickParticles.explode(22, dropX, FIELD.bottom - 8);
+
+    const miss = this.add.text(640, 390, 'MISS', {
+      fontFamily: 'Arial Black',
+      fontSize: '76px',
+      color: '#ff5f4d',
+      stroke: '#090512',
+      strokeThickness: 12,
+    }).setOrigin(0.5).setDepth(12).setScale(0.35).setAngle(-10);
+    this.tweens.add({
+      targets: miss,
+      scale: 1.12,
+      angle: 6,
+      duration: 160,
+      ease: 'Back.easeOut',
+      yoyo: true,
+      hold: 240,
+      onComplete: () => {
+        this.tweens.add({
+          targets: miss,
+          alpha: 0,
+          y: 430,
+          duration: 220,
+          onComplete: () => miss.destroy(),
+        });
+      },
+    });
+
+    this.livesText.setColor('#ff5f4d');
+    this.tweens.add({
+      targets: this.livesText,
+      scale: 1.35,
+      duration: 140,
+      yoyo: true,
+      onComplete: () => this.livesText.setColor('#d7c6eb'),
+    });
+
+    const audio = BREAKOUT_AUDIO.ballHit;
+    if (this.cache.audio.exists(audio.key)) {
+      this.sound.play(audio.key, { volume: 0.5, rate: 0.55 });
+    }
   }
 
   private spawnRipple(x: number, y: number): void {

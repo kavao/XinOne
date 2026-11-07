@@ -28,12 +28,14 @@ export const BALL = {
   radius: 8,
   baseSpeed: 360,
   maxSpeed: 760,
+  maxStep: 8,
 } as const;
 
 export const ITEM = {
   size: 18,
   fallSpeed: 160,
   dropChance: 0.18,
+  wallHitsPerItem: 20,
   pierceDuration: 6,
   laserDuration: 8,
   laserInterval: 0.4,
@@ -55,6 +57,7 @@ export interface Brick {
   y: number;
   kind: BrickKind;
   alive: boolean;
+  hits: number;
 }
 
 export interface Ball {
@@ -248,6 +251,16 @@ export class BreakoutMatch {
   }
 
   private updateBall(ball: Ball, delta: number): void {
+    const travel = Math.hypot(ball.vx, ball.vy) * delta;
+    const steps = Math.max(1, Math.ceil(travel / BALL.maxStep));
+    const stepDelta = delta / steps;
+    for (let step = 0; step < steps; step += 1) {
+      this.integrateBall(ball, stepDelta);
+      if (ball.y - BALL.radius > FIELD.bottom) return;
+    }
+  }
+
+  private integrateBall(ball: Ball, delta: number): void {
     ball.x += ball.vx * delta;
     ball.y += ball.vy * delta;
 
@@ -306,6 +319,7 @@ export class BreakoutMatch {
         this.maybeDropItem(brick);
       } else {
         this.events.push('wall-hit');
+        this.maybeDropFromWall(brick);
       }
       return;
     }
@@ -327,11 +341,11 @@ export class BreakoutMatch {
     const overlapX = halfW + BALL.radius - Math.abs(ball.x - brick.x);
     const overlapY = halfH + BALL.radius - Math.abs(ball.y - brick.y);
     if (overlapX < overlapY) {
-      ball.vx = -ball.vx;
-      ball.x += ball.x < brick.x ? -overlapX : overlapX;
+      ball.vx = ball.x < brick.x ? -Math.abs(ball.vx) : Math.abs(ball.vx);
+      ball.x = brick.x + (ball.x < brick.x ? -(halfW + BALL.radius) : halfW + BALL.radius);
     } else {
-      ball.vy = -ball.vy;
-      ball.y += ball.y < brick.y ? -overlapY : overlapY;
+      ball.vy = ball.y < brick.y ? -Math.abs(ball.vy) : Math.abs(ball.vy);
+      ball.y = brick.y + (ball.y < brick.y ? -(halfH + BALL.radius) : halfH + BALL.radius);
     }
   }
 
@@ -343,6 +357,16 @@ export class BreakoutMatch {
     if (!this.stage.itemsEnabled) return;
     const dropChance = this.stage.itemDropChance ?? ITEM.dropChance;
     if (Math.random() > dropChance) return;
+    this.dropItem(brick);
+  }
+
+  private maybeDropFromWall(brick: Brick): void {
+    brick.hits += 1;
+    if (brick.hits % ITEM.wallHitsPerItem !== 0) return;
+    this.dropItem(brick);
+  }
+
+  private dropItem(brick: Brick): void {
     const type = ITEM_TYPES[Math.floor(Math.random() * ITEM_TYPES.length)];
     this.items.push({ x: brick.x, y: brick.y, type });
     this.events.push('item-drop');
@@ -408,6 +432,7 @@ function buildBricks(stage: StageDefinition): Brick[] {
         y: BRICK.offsetY + row * (BRICK.height + BRICK.gapY) + BRICK.height / 2,
         kind,
         alive: true,
+        hits: 0,
       });
     }
   });

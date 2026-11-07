@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   BALL,
+  BRICK,
   BreakoutMatch,
   FIELD,
   ITEM,
@@ -197,6 +198,38 @@ describe('BreakoutMatch', () => {
     expect(match.consumeEvents()).toContain('item-drop');
   });
 
+  it('does not tunnel through a brick when moving faster than the brick is thick', () => {
+    const match = new BreakoutMatch(SINGLE_NORMAL_BRICK_STAGE);
+    const brick = match.bricks[0];
+    match.balls[0] = {
+      x: brick.x,
+      y: brick.y - BRICK.height / 2 - BALL.radius - 2,
+      vx: 0,
+      vy: 2400,
+    };
+
+    match.update(1 / 30, match.paddleX);
+
+    expect(brick.alive).toBe(false);
+    expect(match.consumeEvents()).toContain('brick-break');
+  });
+
+  it('does not tunnel through the paddle when falling faster than the paddle is thick', () => {
+    const match = new BreakoutMatch(FAR_BRICK_STAGE);
+    match.balls[0] = {
+      x: match.paddleX,
+      y: PADDLE.y - BALL.radius - 2,
+      vx: 0,
+      vy: 2400,
+    };
+
+    match.update(1 / 30, match.paddleX);
+
+    expect(match.balls[0].vy).toBeLessThan(0);
+    expect(match.balls[0].y).toBeLessThanOrEqual(PADDLE.y - BALL.radius);
+    expect(match.consumeEvents()).toContain('paddle-hit');
+  });
+
   it('does not drop an item when the stage drop chance is zero', () => {
     const match = new BreakoutMatch(NEVER_DROP_STAGE);
     const brick = match.bricks[0];
@@ -204,6 +237,52 @@ describe('BreakoutMatch', () => {
 
     match.update(1 / 60, match.paddleX);
 
+    expect(match.items.length).toBe(0);
+    expect(match.consumeEvents()).not.toContain('item-drop');
+  });
+
+  it('drops an item from a wall brick every 20 hits without destroying it', () => {
+    const match = new BreakoutMatch(WALL_AND_NORMAL_STAGE);
+    const wallBrick = match.bricks.find((brick) => brick.kind === 'wall')!;
+
+    for (let hit = 1; hit <= ITEM.wallHitsPerItem * 2; hit += 1) {
+      match.balls[0] = { x: wallBrick.x, y: wallBrick.y, vx: 0, vy: -10 };
+      match.update(1 / 60, match.paddleX);
+      expect(wallBrick.alive).toBe(true);
+      expect(wallBrick.hits).toBe(hit);
+      if (hit % ITEM.wallHitsPerItem === 0) {
+        expect(match.items.length).toBe(hit / ITEM.wallHitsPerItem);
+        expect(match.consumeEvents()).toContain('item-drop');
+      } else {
+        expect(match.items.length).toBe(Math.floor(hit / ITEM.wallHitsPerItem));
+        expect(match.consumeEvents()).not.toContain('item-drop');
+      }
+    }
+  });
+
+  it('counts wall hits per brick so neighboring walls do not share the drop', () => {
+    const match = new BreakoutMatch({
+      id: 1,
+      title: 'Test',
+      grid: ['X#.......X'],
+    });
+    const leftWall = match.bricks[0];
+    const rightWall = match.bricks[2];
+
+    for (let hit = 0; hit < ITEM.wallHitsPerItem - 1; hit += 1) {
+      match.balls[0] = { x: leftWall.x, y: leftWall.y, vx: 0, vy: -10 };
+      match.update(1 / 60, match.paddleX);
+      match.consumeEvents();
+    }
+
+    expect(leftWall.hits).toBe(ITEM.wallHitsPerItem - 1);
+    expect(rightWall.hits).toBe(0);
+
+    match.balls[0] = { x: rightWall.x, y: rightWall.y, vx: 0, vy: -10 };
+    match.update(1 / 60, match.paddleX);
+
+    expect(leftWall.hits).toBe(ITEM.wallHitsPerItem - 1);
+    expect(rightWall.hits).toBe(1);
     expect(match.items.length).toBe(0);
     expect(match.consumeEvents()).not.toContain('item-drop');
   });
