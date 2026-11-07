@@ -1,9 +1,14 @@
 import type { GameSceneData, RuntimeActions } from '@xinone/game-contracts';
 import { playClickSound, playOutcomeSound, playSharedBgm } from '@xinone/shared-assets';
 import Phaser from 'phaser';
-import { BOMB_RADIUS, FIELD, MechaShooterMatch, type ShooterSnapshot } from '../domain/mecha-shooter';
+import { BOMB_RADIUS, FIELD, MechaShooterMatch, type DestroyedEnemy, type ShooterSnapshot } from '../domain/mecha-shooter';
 import { MECHA_SHOOTER_IMAGES } from '../image-manifest';
-import { MECHA_SHOOTER_GAME_SCENE } from './TitleScene';
+import { MECHA_SHOOTER_GAME_SCENE, MECHA_STAGES } from './TitleScene';
+
+interface MechaSceneData extends GameSceneData {
+  continueFrom?: { stage: number; score: number };
+  startStage?: number;
+}
 
 interface ImpactParticle {
   x: number;
@@ -14,6 +19,9 @@ interface ImpactParticle {
   maxLife: number;
   size: number;
   color: number;
+  shape: 'circle' | 'shard';
+  rotation: number;
+  spin: number;
 }
 
 interface Shockwave {
@@ -33,6 +41,7 @@ export class MechaShooterGameScene extends Phaser.Scene {
   private graphics!: Phaser.GameObjects.Graphics;
   private hud!: Phaser.GameObjects.Text;
   private resultShown = false;
+  private resultRecorded = false;
   private fireCooldown = 0;
   private particles: ImpactParticle[] = [];
   private damageFlash = 0;
@@ -51,7 +60,27 @@ export class MechaShooterGameScene extends Phaser.Scene {
   private stageLabel!: Phaser.GameObjects.Text;
   private clearAnnouncement?: Phaser.GameObjects.Text;
   constructor() { super(MECHA_SHOOTER_GAME_SCENE); }
-  init(data: GameSceneData): void { this.runtime = data.runtime; this.match = new MechaShooterMatch(); this.stage = 1; this.resultShown = false; this.fireCooldown = 0; this.particles = []; this.shockwaves = []; this.clearAnnouncement = undefined; this.damageFlash = 0; this.backgroundScroll = 0; this.bossWarningSeconds = 0; this.bossSprite = undefined; this.bossHpGraphics = undefined; this.enemySprites = []; this.bossDefeatCountdown = 0; this.gameOverCountdown = 0; }
+  init(data: GameSceneData): void {
+    const play = data as MechaSceneData;
+    this.runtime = play.runtime;
+    this.stage = play.continueFrom?.stage ?? play.startStage ?? 1;
+    this.match = new MechaShooterMatch(this.stage);
+    if (play.continueFrom) this.match.score = play.continueFrom.score;
+    this.resultShown = false;
+    this.resultRecorded = false;
+    this.fireCooldown = 0;
+    this.particles = [];
+    this.shockwaves = [];
+    this.clearAnnouncement = undefined;
+    this.damageFlash = 0;
+    this.backgroundScroll = 0;
+    this.bossWarningSeconds = 0;
+    this.bossSprite = undefined;
+    this.bossHpGraphics = undefined;
+    this.enemySprites = [];
+    this.bossDefeatCountdown = 0;
+    this.gameOverCountdown = 0;
+  }
   preload(): void {
     if (!this.textures.exists(MECHA_SHOOTER_IMAGES.player.key)) this.load.image(MECHA_SHOOTER_IMAGES.player.key, MECHA_SHOOTER_IMAGES.player.url);
     if (!this.textures.exists(MECHA_SHOOTER_IMAGES.bossStage1.key)) this.load.image(MECHA_SHOOTER_IMAGES.bossStage1.key, MECHA_SHOOTER_IMAGES.bossStage1.url);
@@ -69,8 +98,8 @@ export class MechaShooterGameScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor(0x070b16);
     this.graphics = this.add.graphics();
     this.hud = this.add.text(28, 18, '', { fontFamily: 'Arial', fontSize: '19px', color: '#d9e7ff' });
-    this.stageLabel = this.add.text(640, 18, 'STAGE 1 — ORBITAL ELEVATOR', { fontFamily: 'Arial Black', fontSize: '20px', color: '#ffd166' }).setOrigin(0.5, 0);
-    this.add.text(1150, 690, 'Launcher', { fontFamily: 'Arial Black', fontSize: '18px', color: '#ffffff', backgroundColor: '#18243d', padding: { left: 16, right: 16, top: 8, bottom: 8 } }).setOrigin(0.5).setInteractive({ useHandCursor: true }).on('pointerdown', () => this.runtime.returnToLauncher());
+    this.stageLabel = this.add.text(640, 18, this.stageTitle(), { fontFamily: 'Arial Black', fontSize: '20px', color: '#ffd166' }).setOrigin(0.5, 0);
+    this.add.text(1150, 690, 'Launcher', { fontFamily: 'Arial Black', fontSize: '18px', color: '#ffffff', backgroundColor: '#18243d', padding: { left: 16, right: 16, top: 8, bottom: 8 } }).setOrigin(0.5).setInteractive({ useHandCursor: true }).on('pointerdown', () => this.leaveToLauncher());
     this.add.rectangle(105, 610, 150, 64, 0x263759, 0.95).setStrokeStyle(3, 0x65d8ff, 1).setInteractive({ useHandCursor: true }).on('pointerdown', () => this.triggerBomb());
     this.add.text(105, 610, 'BOMB', { fontFamily: 'Arial Black', fontSize: '22px', color: '#ffffff' }).setOrigin(0.5);
     this.add.text(105, 650, 'RIGHT CLICK / TOUCH', { fontFamily: 'Arial', fontSize: '11px', color: '#9eb6d8' }).setOrigin(0.5);
@@ -126,16 +155,9 @@ export class MechaShooterGameScene extends Phaser.Scene {
     this.match.update(delta / 1000, target);
     this.bossWarningSeconds = Math.max(0, this.bossWarningSeconds - delta / 1000);
     this.backgroundScroll += delta / 1000;
-    const enemiesAfter = this.match.snapshot().enemies;
-    for (const enemy of enemiesBefore) {
-      const stillPresent = enemiesAfter.some((current) => current.kind === enemy.kind && Math.abs(current.x - enemy.x) < 90 && Math.abs(current.y - enemy.y) < 90);
-      if (!stillPresent && enemy.hp <= 0) {
-        this.spawnImpactParticles(enemy.x, enemy.y, enemy.kind === 'boss' ? 42 : 14, enemy.kind === 'boss' ? 0xff8066 : 0xffb347);
-        this.spawnShockwave(enemy.x, enemy.y, enemy.kind === 'boss' ? 220 : 72, enemy.kind === 'boss' ? 0xff8066 : 0xffb347);
-        const scoreValue = enemy.kind === 'boss' ? 5000 : enemy.kind === 'armor' ? 300 : enemy.kind === 'turret' ? 250 : enemy.kind === 'splitter' ? 180 : 100;
-        const scoreText = this.add.text(enemy.x, enemy.y, `+${scoreValue}`, { fontFamily: 'Arial Black', fontSize: '20px', color: '#ffd166', stroke: '#10182a', strokeThickness: 5 }).setOrigin(0.5).setDepth(18);
-        this.tweens.add({ targets: scoreText, y: enemy.y - 52, alpha: 0, duration: 1400, ease: 'Cubic.easeOut', onComplete: () => scoreText.destroy() });
-      }
+    for (const wreck of this.match.consumeDestroyed()) {
+      if (wreck.kind === 'boss') continue;
+      this.spawnDefeatEffect(wreck);
     }
     for (const event of this.match.consumeEvents()) {
       if (event === 'boss-warning') {
@@ -182,8 +204,17 @@ export class MechaShooterGameScene extends Phaser.Scene {
       }
     }
     for (const particle of this.particles) {
-      this.graphics.fillStyle(particle.color, particle.life / particle.maxLife);
-      this.graphics.fillCircle(particle.x, particle.y, particle.size);
+      const alpha = particle.life / particle.maxLife;
+      this.graphics.fillStyle(particle.color, alpha);
+      if (particle.shape === 'shard') {
+        this.graphics.save();
+        this.graphics.translateCanvas(particle.x, particle.y);
+        this.graphics.rotateCanvas(particle.rotation);
+        this.graphics.fillTriangle(-particle.size, particle.size * 0.4, particle.size, particle.size * 0.15, 0, -particle.size);
+        this.graphics.restore();
+      } else {
+        this.graphics.fillCircle(particle.x, particle.y, particle.size);
+      }
     }
     for (const shockwave of this.shockwaves) {
       const progress = 1 - shockwave.life / shockwave.maxLife;
@@ -344,11 +375,56 @@ export class MechaShooterGameScene extends Phaser.Scene {
     this.children.getByName('mecha-shooter:sector-secured')?.destroy();
     playOutcomeSound(this, win ? 'victory' : 'defeat');
     const snapshot = this.match.snapshot();
-    this.runtime.recordResult({ gameId: 'mecha-shooter', scoreType: 'score', value: snapshot.score, unit: '点', winCondition: 'higher', outcome: win ? 'win' : 'lose', playedAt: new Date().toISOString() });
-    this.add.rectangle(640, 360, 500, 250, 0x0b1024, 0.96).setStrokeStyle(3, win ? 0xffd166 : 0xff8066);
-    this.add.text(640, 295, win ? 'GAME CLEAR' : 'GAME OVER', { fontFamily: 'Arial Black', fontSize: '38px', color: win ? '#ffd166' : '#ff8066' }).setOrigin(0.5);
-    this.add.text(640, 350, `Score ${snapshot.score}`, { fontFamily: 'Arial', fontSize: '23px', color: '#ffffff' }).setOrigin(0.5);
-    this.add.text(640, 420, win ? 'Click to play again' : 'Click to retry', { fontFamily: 'Arial', fontSize: '20px', color: '#8ed8ff' }).setOrigin(0.5).setInteractive({ useHandCursor: true }).on('pointerdown', () => this.scene.restart({ runtime: this.runtime }));
+    if (win) this.recordOutcome('win');
+    this.add.rectangle(640, 360, 560, win ? 250 : 290, 0x0b1024, 0.96).setStrokeStyle(3, win ? 0xffd166 : 0xff8066).setDepth(20);
+    this.add.text(640, win ? 295 : 278, win ? 'GAME CLEAR' : 'GAME OVER', { fontFamily: 'Arial Black', fontSize: '38px', color: win ? '#ffd166' : '#ff8066' }).setOrigin(0.5).setDepth(21);
+    this.add.text(640, win ? 350 : 332, `Score ${snapshot.score}`, { fontFamily: 'Arial', fontSize: '23px', color: '#ffffff' }).setOrigin(0.5).setDepth(21);
+    if (win) {
+      this.add.text(640, 420, 'Click to play again', { fontFamily: 'Arial', fontSize: '20px', color: '#8ed8ff' }).setOrigin(0.5).setDepth(21).setInteractive({ useHandCursor: true }).on('pointerdown', () => this.scene.restart({ runtime: this.runtime }));
+      return;
+    }
+    this.resultButton(520, 420, 'CONTINUE', () => this.continueRun());
+    this.resultButton(760, 420, 'START', () => this.restartFromBeginning());
+  }
+  private continueRun(): void {
+    const snapshot = this.match.snapshot();
+    this.scene.restart({ runtime: this.runtime, continueFrom: { stage: this.stage, score: snapshot.score } } satisfies MechaSceneData);
+  }
+  private restartFromBeginning(): void {
+    this.recordOutcome('lose');
+    this.scene.restart({ runtime: this.runtime });
+  }
+  private leaveToLauncher(): void {
+    if (this.match.status === 'game-over') this.recordOutcome('lose');
+    this.runtime.returnToLauncher();
+  }
+  private recordOutcome(outcome: 'win' | 'lose'): void {
+    if (this.resultRecorded) return;
+    this.resultRecorded = true;
+    const snapshot = this.match.snapshot();
+    this.runtime.recordResult({
+      gameId: 'mecha-shooter',
+      scoreType: 'score',
+      value: snapshot.score,
+      unit: '点',
+      winCondition: 'higher',
+      outcome,
+      playedAt: new Date().toISOString(),
+    });
+  }
+  private stageTitle(): string {
+    const stage = MECHA_STAGES.find((entry) => entry.id === this.stage) ?? MECHA_STAGES[0];
+    return `STAGE ${stage.id} — ${stage.name}`;
+  }
+  private resultButton(x: number, y: number, label: string, onClick: () => void): void {
+    const background = this.add.rectangle(x, y, 200, 54, 0x18243d).setStrokeStyle(2, 0xff8066).setInteractive({ useHandCursor: true }).setDepth(21);
+    this.add.text(x, y, label, { fontFamily: 'Arial Black', fontSize: '20px', color: '#ffffff' }).setOrigin(0.5).setDepth(22);
+    background.on('pointerdown', () => {
+      playClickSound(this);
+      onClick();
+    });
+    background.on('pointerover', () => background.setFillStyle(0x2b3b60));
+    background.on('pointerout', () => background.setFillStyle(0x18243d));
   }
   private startStage2(): void {
     const previous = this.match.snapshot();
@@ -366,7 +442,7 @@ export class MechaShooterGameScene extends Phaser.Scene {
     this.bossDefeatCountdown = 0;
     this.bossSprite?.setAlpha(0);
     this.bossHpGraphics?.clear();
-    this.stageLabel.setText('STAGE 2 — DUST MINING BASE');
+    this.stageLabel.setText(this.stageTitle());
     this.spawnImpactParticles(640, 360, 70, 0x65d8ff);
     this.spawnShockwave(640, 360, 280, 0x65d8ff);
     this.cameras.main.flash(500, 45, 130, 190);
@@ -377,12 +453,58 @@ export class MechaShooterGameScene extends Phaser.Scene {
   private triggerBomb(): void {
     if (this.match.useBomb()) playClickSound(this);
   }
+  private spawnDefeatEffect(wreck: DestroyedEnemy): void {
+    const scoreValue = wreck.kind === 'armor' ? 300 : wreck.kind === 'turret' ? 250 : wreck.kind === 'splitter' ? 180 : wreck.kind === 'guard' ? 150 : 100;
+    const scoreText = this.add.text(wreck.x, wreck.y, `+${scoreValue}`, { fontFamily: 'Arial Black', fontSize: '20px', color: '#ffd166', stroke: '#10182a', strokeThickness: 5 }).setOrigin(0.5).setDepth(18);
+    this.tweens.add({ targets: scoreText, y: wreck.y - 52, alpha: 0, duration: 1400, ease: 'Cubic.easeOut', onComplete: () => scoreText.destroy() });
+    if (wreck.kind === 'armor') {
+      this.spawnImpactParticles(wreck.x, wreck.y, 22, 0x8a8f9c);
+      this.spawnImpactParticles(wreck.x, wreck.y, 16, 0xffb347);
+      this.spawnShards(wreck.x, wreck.y, 10, 0x6d7180);
+      this.spawnShockwave(wreck.x, wreck.y, 120, 0xc4b8a0);
+      this.spawnShockwave(wreck.x, wreck.y, 70, 0xff8066);
+      this.cameras.main.shake(90, 0.004);
+      return;
+    }
+    if (wreck.kind === 'turret') {
+      this.spawnImpactParticles(wreck.x, wreck.y, 18, 0xff705d);
+      this.spawnImpactParticles(wreck.x, wreck.y, 14, 0xffc15a);
+      this.spawnShards(wreck.x, wreck.y, 7, 0x8b624e);
+      this.spawnShockwave(wreck.x, wreck.y, 95, 0xff8066);
+      this.cameras.main.shake(80, 0.0035);
+      return;
+    }
+    if (wreck.kind === 'splitter') {
+      this.spawnImpactParticles(wreck.x, wreck.y, 16, 0x8a5eb5);
+      this.spawnImpactParticles(wreck.x, wreck.y, 12, 0xe0c4ff);
+      this.spawnShockwave(wreck.x, wreck.y, 64, 0xb28cff);
+      this.spawnShockwave(wreck.x - 26, wreck.y, 42, 0x8a5eb5);
+      this.spawnShockwave(wreck.x + 26, wreck.y, 42, 0x8a5eb5);
+      this.cameras.main.shake(70, 0.003);
+      return;
+    }
+    const color = wreck.kind === 'guard' ? 0x9b6b4e : wreck.kind === 'striker' ? 0x4e8b78 : 0x65d8ff;
+    this.spawnImpactParticles(wreck.x, wreck.y, wreck.kind === 'guard' ? 16 : 12, color);
+    this.spawnShockwave(wreck.x, wreck.y, wreck.kind === 'guard' ? 80 : 56, color);
+  }
   private spawnImpactParticles(x: number, y: number, count: number, color: number): void {
     for (let index = 0; index < count; index += 1) {
       const angle = Math.random() * Math.PI * 2;
       const speed = 60 + Math.random() * 180;
       const life = 0.25 + Math.random() * 0.35;
-      this.particles.push({ x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, life, maxLife: life, size: 2 + Math.random() * 3, color });
+      this.particles.push({ x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, life, maxLife: life, size: 2 + Math.random() * 3, color, shape: 'circle', rotation: 0, spin: 0 });
+    }
+  }
+  private spawnShards(x: number, y: number, count: number, color: number): void {
+    for (let index = 0; index < count; index += 1) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 80 + Math.random() * 160;
+      const life = 0.35 + Math.random() * 0.3;
+      this.particles.push({
+        x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed - 40,
+        life, maxLife: life, size: 4 + Math.random() * 5, color, shape: 'shard',
+        rotation: Math.random() * Math.PI, spin: (Math.random() - 0.5) * 8,
+      });
     }
   }
   private updateParticles(delta: number): void {
@@ -390,6 +512,7 @@ export class MechaShooterGameScene extends Phaser.Scene {
       particle.x += particle.vx * delta;
       particle.y += particle.vy * delta;
       particle.vy += 180 * delta;
+      particle.rotation += particle.spin * delta;
       particle.life -= delta;
     }
     this.particles = this.particles.filter((particle) => particle.life > 0);

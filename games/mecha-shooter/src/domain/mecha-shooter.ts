@@ -33,6 +33,10 @@ export interface ShooterSnapshot {
 
 export type ShooterEvent = 'player-hit' | 'enemy-destroyed' | 'boss-warning' | 'boss-arrived' | 'clear' | 'game-over' | 'bomb-used';
 
+export interface DestroyedEnemy extends Point {
+  kind: EnemyKind;
+}
+
 export class MechaShooterMatch {
   readonly stage: number;
   player: Point = { x: 640, y: 620 };
@@ -56,6 +60,7 @@ export class MechaShooterMatch {
   private bossIntroSeconds = 0;
   private moveTarget: Point = { ...this.player };
   private events: ShooterEvent[] = [];
+  private destroyed: DestroyedEnemy[] = [];
 
   constructor(stage = 1) {
     this.stage = stage;
@@ -234,7 +239,12 @@ export class MechaShooterMatch {
     this.invulnerableSeconds = BOMB_DURATION;
     for (const enemy of this.enemies) {
       if (Math.hypot(enemy.x - this.player.x, enemy.y - this.player.y) <= BOMB_RADIUS) {
-        enemy.hp = enemy.kind === 'boss' ? Math.max(1, enemy.hp - enemy.maxHp / 4) : 0;
+        if (enemy.kind === 'boss') {
+          enemy.hp = Math.max(1, enemy.hp - enemy.maxHp / 4);
+        } else if (enemy.hp > 0) {
+          enemy.hp = 0;
+          this.noteDestroyed(enemy);
+        }
       }
     }
     this.bullets = this.bullets.filter((bullet) => bullet.fromPlayer);
@@ -247,6 +257,16 @@ export class MechaShooterMatch {
   }
 
   consumeEvents(): ShooterEvent[] { return this.events.splice(0); }
+
+  consumeDestroyed(): DestroyedEnemy[] {
+    const wrecks = this.destroyed;
+    this.destroyed = [];
+    return wrecks;
+  }
+
+  private noteDestroyed(enemy: Enemy): void {
+    this.destroyed.push({ x: enemy.x, y: enemy.y, kind: enemy.kind });
+  }
 
   private resolveCollisions(): void {
     for (const bullet of this.bullets) {
@@ -274,6 +294,7 @@ export class MechaShooterMatch {
             }
             this.score += scoreForEnemy(enemy.kind);
             this.events.push('enemy-destroyed');
+            this.noteDestroyed(enemy);
           }
           break;
         }

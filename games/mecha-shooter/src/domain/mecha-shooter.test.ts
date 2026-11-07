@@ -19,6 +19,18 @@ describe('MechaShooterMatch', () => {
     expect(match.useBomb()).toBe(true);
   });
 
+  it('records destroyed enemies for defeat effects', () => {
+    const match = new MechaShooterMatch(2);
+    match.enemies.push({ x: 640, y: 200, kind: 'armor', width: 70, height: 58, hp: 1, maxHp: 14, phase: 0 });
+    match.bullets.push({ x: 640, y: 200, vx: 0, vy: 0, radius: 8, fromPlayer: true, damage: 4 });
+    match.update(0.016, { x: 640, y: 620 });
+    const wrecks = match.consumeDestroyed();
+    expect(wrecks).toHaveLength(1);
+    expect(wrecks[0]?.kind).toBe('armor');
+    expect(wrecks[0]?.x).toBeCloseTo(640);
+    expect(match.consumeDestroyed()).toEqual([]);
+  });
+
   it('moves the player inside the field bounds', () => {
     const match = new MechaShooterMatch();
     match.update(0.016, { x: -100, y: -100 });
