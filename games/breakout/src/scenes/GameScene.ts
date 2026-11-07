@@ -31,6 +31,19 @@ const ITEM_COLORS: Record<ItemType, number> = {
   laser: 0xff5f4d,
 };
 
+const ITEM_POPUPS: Record<ItemType, { label: string; color: string }> = {
+  'multi-ball': { label: 'MULTI', color: '#65d8ff' },
+  'paddle-extend': { label: 'WIDE', color: '#ff70d9' },
+  pierce: { label: 'PIERCE', color: '#ffd166' },
+  laser: { label: 'LASER', color: '#ff5f4d' },
+};
+
+function formatLives(lives: number): string {
+  if (lives <= 0) return 'LIVES  ○';
+  if (lives <= 8) return `LIVES  ${'◆'.repeat(lives)}`;
+  return `LIVES  ◆×${lives}`;
+}
+
 const FINALE_ROCKET = [
   '...BB...',
   '..BBBB..',
@@ -62,6 +75,7 @@ export class BreakoutGameScene extends Phaser.Scene {
   private pointerHasMoved = false;
   private resultShown = false;
   private missLockSeconds = 0;
+  private startHoldSeconds = 0;
   private pendingGameOver = false;
   private sliceEnabled = true;
 
@@ -77,6 +91,7 @@ export class BreakoutGameScene extends Phaser.Scene {
     this.pointerHasMoved = false;
     this.resultShown = false;
     this.missLockSeconds = 0;
+    this.startHoldSeconds = import.meta.env.DEV ? 1.5 : 0;
     this.pendingGameOver = false;
   }
 
@@ -102,9 +117,9 @@ export class BreakoutGameScene extends Phaser.Scene {
       fontSize: '22px',
       color: '#ffd166',
     }).setOrigin(0.5, 0);
-    this.livesText = this.add.text(FIELD.left, 14, '', {
-      fontFamily: 'Arial',
-      fontSize: '18px',
+    this.livesText = this.add.text(36, 20, '', {
+      fontFamily: 'Arial Black',
+      fontSize: '20px',
       color: '#d7c6eb',
     }).setOrigin(0, 0);
 
@@ -119,6 +134,11 @@ export class BreakoutGameScene extends Phaser.Scene {
 
   update(_time: number, deltaMilliseconds: number): void {
     const deltaSeconds = deltaMilliseconds / 1000;
+    if (this.startHoldSeconds > 0) {
+      this.startHoldSeconds -= deltaSeconds;
+      this.render();
+      return;
+    }
     if (this.missLockSeconds > 0) {
       this.missLockSeconds -= deltaSeconds;
       if (this.missLockSeconds <= 0 && this.pendingGameOver) this.showResult();
@@ -149,9 +169,6 @@ export class BreakoutGameScene extends Phaser.Scene {
         case 'brick-break':
           this.playBallHitSound();
           break;
-        case 'item-collect':
-          playClickSound(this);
-          break;
         case 'ball-lost': {
           const fallen = ballsBefore.reduce((lowest, ball) => (ball.y > lowest.y ? ball : lowest), ballsBefore[0]);
           this.playMissSting(fallen ?? { x: this.match.paddleX, y: FIELD.bottom });
@@ -169,6 +186,10 @@ export class BreakoutGameScene extends Phaser.Scene {
       }
     }
     if (hadPaddleHit) this.spawnRipple(this.match.paddleX, PADDLE.y);
+    this.match.consumeCollectedItems().forEach((type, index) => {
+      playClickSound(this);
+      this.spawnPowerUpPopup(type, index);
+    });
 
     this.render();
   }
@@ -297,6 +318,36 @@ export class BreakoutGameScene extends Phaser.Scene {
     }
   }
 
+  private spawnPowerUpPopup(type: ItemType, index: number): void {
+    const popup = ITEM_POPUPS[type];
+    const x = this.match.paddleX + index * 52;
+    const y = PADDLE.y - 28;
+    const text = this.add.text(x, y, popup.label, {
+      fontFamily: 'Arial Black',
+      fontSize: '36px',
+      color: popup.color,
+      stroke: '#090512',
+      strokeThickness: 10,
+    }).setOrigin(0.5).setDepth(12).setScale(0.72);
+    this.tweens.add({
+      targets: text,
+      y: y - 96,
+      scale: 1.18,
+      duration: 280,
+      ease: 'Back.easeOut',
+      onComplete: () => {
+        this.tweens.add({
+          targets: text,
+          y: y - 150,
+          alpha: 0,
+          duration: 500,
+          ease: 'Cubic.easeOut',
+          onComplete: () => text.destroy(),
+        });
+      },
+    });
+  }
+
   private spawnRipple(x: number, y: number): void {
     const ripple = this.add.circle(x, y, BALL.radius, 0xffffff, 0);
     ripple.setStrokeStyle(2, 0x9fd8ff, 0.7);
@@ -357,7 +408,7 @@ export class BreakoutGameScene extends Phaser.Scene {
     }
 
     this.stageText.setText(`STAGE ${this.stageNumber}/${STAGE_COUNT} — ${this.match.stage.title}  (Bricks: ${snapshot.bricksRemaining})`);
-    this.livesText.setText(`LIVES ${snapshot.lives}`);
+    this.livesText.setText(formatLives(snapshot.lives));
   }
 
   private showResult(): void {

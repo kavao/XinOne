@@ -152,6 +152,7 @@ describe('BreakoutMatch', () => {
 
     expect(match.balls.length).toBe(3);
     expect(match.consumeEvents()).toContain('item-collect');
+    expect(match.consumeCollectedItems()).toEqual(['multi-ball']);
   });
 
   it('temporarily extends the paddle when a paddle-extend item is collected', () => {

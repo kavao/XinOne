@@ -141,6 +141,7 @@ export class BreakoutMatch {
   private laserCooldown = 0;
   private paddleVx = 0;
   private events: BreakoutEvent[] = [];
+  private collectedItems: ItemType[] = [];
 
   constructor(readonly stage: StageDefinition, options: BreakoutOptions = {}) {
     this.sliceEnabled = options.sliceEnabled !== false;
@@ -180,6 +181,10 @@ export class BreakoutMatch {
 
   consumeEvents(): BreakoutEvent[] {
     return this.events.splice(0);
+  }
+
+  consumeCollectedItems(): ItemType[] {
+    return this.collectedItems.splice(0);
   }
 
   private movePaddle(targetX: number, delta: number): void {
@@ -244,6 +249,7 @@ export class BreakoutMatch {
 
   private collectItem(type: ItemType): void {
     this.events.push('item-collect');
+    this.collectedItems.push(type);
     switch (type) {
       case 'multi-ball': {
         const source = this.balls[0];
