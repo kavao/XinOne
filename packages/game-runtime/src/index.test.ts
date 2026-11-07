@@ -75,6 +75,20 @@ describe('GameRuntime', () => {
     expect(runtime.getResults()[1].gameId).toBe('minesweeper');
   });
 
+  it('restarts the active game from its title scene', () => {
+    const scene = { start: vi.fn(), stop: vi.fn(), isActive: vi.fn(), isPaused: vi.fn() };
+    const runtime = new GameRuntime({ scene } as never, 'app:launcher', 'app:overlay');
+    runtime.launch(definition('one'));
+    scene.start.mockClear();
+    scene.stop.mockClear();
+
+    runtime.returnToTitle();
+
+    expect(scene.stop).toHaveBeenCalledWith('one:start');
+    expect(scene.start).toHaveBeenCalledWith('one:start', { runtime });
+    expect(scene.start).toHaveBeenCalledWith('app:overlay', { runtime });
+  });
+
   it('pauses and resumes every active scene owned by the launched game', () => {
     const scene = {
       start: vi.fn(),

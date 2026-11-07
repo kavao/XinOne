@@ -35,6 +35,11 @@ export class GameRuntime implements RuntimeActions {
     this.game.scene.start(this.launcherSceneKey);
   }
 
+  returnToTitle(): void {
+    if (!this.activeGame) return;
+    this.launch(this.activeGame);
+  }
+
   togglePause(): boolean {
     if (!this.activeGame) return false;
     this.paused = !this.paused;

@@ -14,6 +14,7 @@ export interface GameResult {
 
 export interface RuntimeActions {
   returnToLauncher(): void;
+  returnToTitle(): void;
   togglePause(): boolean;
   isPaused(): boolean;
   canToggleFullscreen(): boolean;

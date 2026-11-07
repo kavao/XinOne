@@ -21,7 +21,7 @@ interface SceneInternals {
 
 function sceneAtBossDefeat(stage: number) {
   const runtime: RuntimeActions = {
-    returnToLauncher: vi.fn(), togglePause: () => false, isPaused: () => false,
+    returnToLauncher: vi.fn(), returnToTitle: vi.fn(), togglePause: () => false, isPaused: () => false,
     canToggleFullscreen: () => false, toggleFullscreen: async () => {}, recordResult: vi.fn(),
   };
   const scene = new MechaShooterGameScene();
