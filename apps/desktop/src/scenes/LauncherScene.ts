@@ -123,8 +123,10 @@ export class LauncherScene extends Phaser.Scene {
   private createResultsPanel(): void {
     const results = getRuntime().getResults();
     const recent = [...results].reverse().slice(0, 5);
+    const x = gameDefinitions.length > 3 ? 850 : 70;
+    const y = gameDefinitions.length > 3 ? 480 : 455;
 
-    this.add.text(70, 455, 'RECENT RESULTS', {
+    this.add.text(x, y, 'RECENT RESULTS', {
       fontFamily: 'Arial Black',
       fontSize: '15px',
       color: '#91a4bd',
@@ -132,19 +134,20 @@ export class LauncherScene extends Phaser.Scene {
 
     const divider = this.add.graphics();
     divider.fillStyle(0x1d3553, 1);
-    divider.fillRect(70, 477, 1140, 1);
+    divider.fillRect(x, y + 22, gameDefinitions.length > 3 ? 340 : 1140, 1);
 
     if (recent.length === 0) {
-      this.add.text(70, 490, 'No results yet — play a game!', {
+      this.add.text(x, y + 35, 'No results yet — play a game!', {
         fontFamily: 'Arial',
         fontSize: '17px',
         color: '#334a63',
+        wordWrap: { width: gameDefinitions.length > 3 ? 330 : 1100 },
       });
       return;
     }
 
     recent.forEach((result, i) => {
-      const y = 490 + i * 32;
+      const rowY = y + 35 + i * 32;
       const gameDef = gameDefinitions.find((d) => d.id === result.gameId);
       const gameTitle = gameDef?.title ?? result.gameId;
       const accentColor = gameDef
@@ -156,10 +159,10 @@ export class LauncherScene extends Phaser.Scene {
       const dt = new Date(result.playedAt);
       const timeLabel = `${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`;
 
-      this.add.text(70, y, gameTitle, { fontFamily: 'Arial Black', fontSize: '18px', color: accentColor });
-      this.add.text(310, y, outcomeLabel, { fontFamily: 'Arial Black', fontSize: '18px', color: outcomeColor });
-      this.add.text(410, y, scoreLabel, { fontFamily: 'Arial Black', fontSize: '18px', color: '#f8fafc' });
-      this.add.text(570, y, timeLabel, { fontFamily: 'Arial', fontSize: '16px', color: '#91a4bd' });
+      this.add.text(x, rowY, gameTitle, { fontFamily: 'Arial Black', fontSize: '16px', color: accentColor });
+      this.add.text(x + 160, rowY, outcomeLabel, { fontFamily: 'Arial Black', fontSize: '16px', color: outcomeColor });
+      this.add.text(x + 230, rowY, scoreLabel, { fontFamily: 'Arial Black', fontSize: '16px', color: '#f8fafc' });
+      this.add.text(x + 290, rowY, timeLabel, { fontFamily: 'Arial', fontSize: '14px', color: '#91a4bd' });
     });
   }
 

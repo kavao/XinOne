@@ -14,6 +14,7 @@
   "dependencies": {
     "@tauri-apps/api": "^2",
     "@xinone/breakout": "*",
+    "@xinone/floor-hopper": "*",
     "@xinone/game-contracts": "*",
     "@xinone/game-runtime": "*",
     "@xinone/hockey": "*",
