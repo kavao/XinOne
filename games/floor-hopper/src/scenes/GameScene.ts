@@ -1,5 +1,5 @@
 import type { GameSceneData, RuntimeActions } from '@xinone/game-contracts';
-import { playOutcomeSound, playSharedBgm } from '@xinone/shared-assets';
+import { playOutcomeSound, playSharedBgm, SHARED_AUDIO } from '@xinone/shared-assets';
 import Phaser from 'phaser';
 import {
   CLEAR_SECONDS,
@@ -75,6 +75,8 @@ export class FloorHopperGameScene extends Phaser.Scene {
   private pointerWasDown = false;
   private resultShown = false;
   private puffs: KickPuff[] = [];
+  private fallLockSeconds = 0;
+  private pendingGameOver = false;
 
   constructor() {
     super(FLOOR_HOPPER_GAME_SCENE);
@@ -85,6 +87,8 @@ export class FloorHopperGameScene extends Phaser.Scene {
     this.run = new FloorHopperRun();
     this.pointerWasDown = false;
     this.resultShown = false;
+    this.fallLockSeconds = 0;
+    this.pendingGameOver = false;
     this.stars = [];
     this.puffs = [];
   }
@@ -131,14 +135,20 @@ export class FloorHopperGameScene extends Phaser.Scene {
   }
 
   update(_time: number, deltaMilliseconds: number): void {
-    this.readJumpInput();
-    this.run.update(deltaMilliseconds / 1000);
-    this.spawnKickEffects();
-    this.updatePuffs(deltaMilliseconds / 1000);
-    this.render();
-    if ((this.run.status === 'game-over' || this.run.status === 'cleared') && !this.resultShown) {
-      this.showResult();
+    const deltaSeconds = deltaMilliseconds / 1000;
+    if (this.fallLockSeconds > 0) {
+      this.fallLockSeconds -= deltaSeconds;
+      this.updatePuffs(deltaSeconds);
+      this.render();
+      if (this.fallLockSeconds <= 0 && this.pendingGameOver) this.showResult();
+      return;
     }
+    this.readJumpInput();
+    this.run.update(deltaSeconds);
+    this.spawnKickEffects();
+    this.updatePuffs(deltaSeconds);
+    this.render();
+    if (this.run.status === 'cleared' && !this.resultShown) this.showResult();
   }
 
   private readJumpInput(): void {
@@ -262,6 +272,99 @@ export class FloorHopperGameScene extends Phaser.Scene {
     for (const event of this.run.consumeEvents()) {
       if (event === 'jump') this.spawnGroundKick();
       if (event === 'double-jump') this.spawnAirKick();
+      if (event === 'downed') this.playFallSting(false);
+      if (event === 'game-over') this.playFallSting(true);
+    }
+  }
+
+  private playFallSting(finalLife: boolean): void {
+    if (finalLife) {
+      this.fallLockSeconds = 0.95;
+      this.pendingGameOver = true;
+    }
+    this.cameras.main.shake(finalLife ? 380 : 280, finalLife ? 0.018 : 0.012);
+    this.cameras.main.flash(220, 210, 30, 50);
+
+    const wash = this.add.rectangle(WORLD.width / 2, WORLD.height / 2, WORLD.width, WORLD.height, 0xff2a3a, 0.4).setDepth(8);
+    this.tweens.add({
+      targets: wash,
+      alpha: 0,
+      duration: 560,
+      ease: 'Cubic.easeOut',
+      onComplete: () => wash.destroy(),
+    });
+
+    const dropX = WORLD.playerX;
+    const dropY = WORLD.height - 18;
+    const ghost = this.add.container(dropX, dropY - 40).setDepth(9);
+    const body = this.add.rectangle(0, 8, WORLD.playerHalfWidth * 2 - 8, 28, 0xf8fafc);
+    const head = this.add.circle(0, -12, 11, 0x5eead4);
+    ghost.add([body, head]);
+    this.tweens.add({
+      targets: ghost,
+      y: WORLD.height + 50,
+      scaleX: 0.4,
+      scaleY: 1.8,
+      alpha: 0,
+      duration: 420,
+      ease: 'Cubic.easeIn',
+      onComplete: () => ghost.destroy(),
+    });
+
+    for (let i = 0; i < 10; i += 1) {
+      const dir = i < 5 ? -1 : 1;
+      const life = 0.32 + Math.random() * 0.2;
+      this.puffs.push({
+        x: dropX + dir * (6 + Math.random() * 18),
+        y: dropY,
+        vx: dir * (70 + Math.random() * 140),
+        vy: -80 - Math.random() * 120,
+        life,
+        maxLife: life,
+        size: 4 + Math.random() * 6,
+        color: i % 2 === 0 ? 0xff5f4d : 0x4a3b2a,
+        kind: 'dust',
+        scroll: false,
+      });
+    }
+
+    const miss = this.add.text(640, 360, 'FALL', {
+      fontFamily: 'Arial Black',
+      fontSize: '76px',
+      color: '#ff5f4d',
+      stroke: '#071018',
+      strokeThickness: 12,
+    }).setOrigin(0.5).setDepth(12).setScale(0.35).setAngle(-10);
+    this.tweens.add({
+      targets: miss,
+      scale: 1.12,
+      angle: 6,
+      duration: 160,
+      ease: 'Back.easeOut',
+      yoyo: true,
+      hold: finalLife ? 280 : 200,
+      onComplete: () => {
+        this.tweens.add({
+          targets: miss,
+          alpha: 0,
+          y: 400,
+          duration: 220,
+          onComplete: () => miss.destroy(),
+        });
+      },
+    });
+
+    this.livesText.setColor('#ff5f4d');
+    this.tweens.add({
+      targets: this.livesText,
+      scale: 1.3,
+      duration: 140,
+      yoyo: true,
+      onComplete: () => this.livesText.setColor('#c47b16'),
+    });
+
+    if (this.cache.audio.exists(SHARED_AUDIO.uiClick.key)) {
+      this.sound.play(SHARED_AUDIO.uiClick.key, { volume: 0.55, rate: 0.48 });
     }
   }
 
