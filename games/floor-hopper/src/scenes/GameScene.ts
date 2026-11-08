@@ -1,5 +1,5 @@
 import type { GameSceneData, RuntimeActions } from '@xinone/game-contracts';
-import { playOutcomeSound, playSharedBgm, SHARED_AUDIO } from '@xinone/shared-assets';
+import { hideSceneLoading, playOutcomeSound, playSharedBgm, SHARED_AUDIO, showSceneLoading } from '@xinone/shared-assets';
 import Phaser from 'phaser';
 import {
   CLEAR_SECONDS,
@@ -97,9 +97,11 @@ export class FloorHopperGameScene extends Phaser.Scene {
   preload(): void {
     const jump = FLOOR_HOPPER_AUDIO.jump;
     if (!this.cache.audio.exists(jump.key)) this.load.audio(jump.key, jump.url);
+    showSceneLoading(this, '#5eead4');
   }
 
   create(): void {
+    hideSceneLoading(this);
     playSharedBgm(this, 'active');
     this.cameras.main.setBackgroundColor(0x7ec8e3);
     this.skyGraphics = this.add.graphics().setDepth(-3);

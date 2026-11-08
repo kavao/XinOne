@@ -1,5 +1,5 @@
 import type { GameResult } from '@xinone/game-contracts';
-import { playClickSound, playSharedBgm, preloadSharedAudio } from '@xinone/shared-assets';
+import { hideSceneLoading, playClickSound, playSharedBgm, preloadSharedAudio, showSceneLoading } from '@xinone/shared-assets';
 import Phaser from 'phaser';
 import { gameDefinitions } from '../registry';
 import { getRuntime } from '../runtime-context';
@@ -24,9 +24,11 @@ export class LauncherScene extends Phaser.Scene {
 
   preload(): void {
     preloadSharedAudio(this);
+    showSceneLoading(this);
   }
 
   create(): void {
+    hideSceneLoading(this);
     playSharedBgm(this, 'title');
     this.cameras.main.setBackgroundColor(0x08111f);
     this.createSpaceBackground();

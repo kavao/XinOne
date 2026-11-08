@@ -1,10 +1,10 @@
 import type { GameSceneData, RuntimeActions } from '@xinone/game-contracts';
-import { playClickSound, playOutcomeSound, playSharedBgm } from '@xinone/shared-assets';
+import { hideSceneLoading, playClickSound, playOutcomeSound, playSharedBgm, showSceneLoading } from '@xinone/shared-assets';
 import Phaser from 'phaser';
 import { BOMB_RADIUS, FIELD, MechaShooterMatch, type DestroyedEnemy, type ShooterSnapshot } from '../domain/mecha-shooter';
 import { DRILL_SIZE, getArmMuzzle, getDrillMuzzle, getDrillScale, getStage2WeakPoint, STAGE2_BOSS_SIZE } from '../domain/stage2-boss';
 import { STAGE3_BOSS_SIZE, STAGE3_SAFE_WIDTH } from '../domain/stage3';
-import { MECHA_SHOOTER_IMAGES } from '../image-manifest';
+import { MECHA_SHOOTER_IMAGES, queueMechaShooterImages } from '../image-manifest';
 import { MECHA_SHOOTER_GAME_SCENE, MECHA_STAGES } from './TitleScene';
 
 interface MechaSceneData extends GameSceneData {
@@ -64,6 +64,7 @@ export class MechaShooterGameScene extends Phaser.Scene {
   private stage = 1;
   private stageLabel!: Phaser.GameObjects.Text;
   private clearAnnouncement?: Phaser.GameObjects.Text;
+  private pointerHasMoved = false;
   constructor() { super(MECHA_SHOOTER_GAME_SCENE); }
   init(data: GameSceneData): void {
     const play = data as MechaSceneData;
@@ -86,13 +87,15 @@ export class MechaShooterGameScene extends Phaser.Scene {
     this.drillSprites = [];
     this.bossDefeatCountdown = 0;
     this.gameOverCountdown = 0;
+    this.pointerHasMoved = false;
   }
   preload(): void {
-    for (const image of Object.values(MECHA_SHOOTER_IMAGES)) {
-      if (!this.textures.exists(image.key)) this.load.image(image.key, image.url);
-    }
+    this.cameras.main.setBackgroundColor(0x070b16);
+    queueMechaShooterImages(this);
+    showSceneLoading(this, '#ff8066');
   }
   create(): void {
+    hideSceneLoading(this);
     playSharedBgm(this, 'active');
     this.cameras.main.setBackgroundColor(0x070b16);
     this.graphics = this.add.graphics();
@@ -108,6 +111,9 @@ export class MechaShooterGameScene extends Phaser.Scene {
       if (pointer.button === 2 && this.isInField(pointer.x, pointer.y)) this.triggerBomb();
     });
     this.input.mouse?.disableContextMenu();
+    this.input.once('pointermove', () => {
+      this.pointerHasMoved = true;
+    });
     this.render(this.match.snapshot());
   }
   update(_time: number, delta: number): void {
@@ -152,7 +158,9 @@ export class MechaShooterGameScene extends Phaser.Scene {
     }
     const pointer = this.input.activePointer;
     const player = this.match.snapshot().player;
-    const target = this.isInField(pointer.x, pointer.y) ? { x: pointer.x, y: pointer.y } : player;
+    const target = this.pointerHasMoved && this.isInField(pointer.x, pointer.y)
+      ? { x: pointer.x, y: pointer.y }
+      : player;
     this.match.update(delta / 1000, target);
     this.bossWarningSeconds = Math.max(0, this.bossWarningSeconds - delta / 1000);
     this.backgroundScroll += delta / 1000;

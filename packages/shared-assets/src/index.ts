@@ -57,6 +57,34 @@ export function preloadSharedAudio(scene: Phaser.Scene): void {
   }
 }
 
+const LOADING_OBJECT_NAME = 'xinone:loading';
+
+function pendingLoadCount(scene: Phaser.Scene): number {
+  const list = scene.load.list as { size?: number } | undefined;
+  if (typeof list?.size === 'number') return list.size;
+  return scene.load.totalToLoad;
+}
+
+export function showSceneLoading(scene: Phaser.Scene, color = '#f8fafc'): void {
+  if (pendingLoadCount(scene) <= 0) return;
+  if (scene.children.getByName(LOADING_OBJECT_NAME)) return;
+  const label = scene.add.text(640, 360, 'LOADING', {
+    fontFamily: 'Arial Black',
+    fontSize: '28px',
+    color,
+    stroke: '#090512',
+    strokeThickness: 8,
+  }).setOrigin(0.5).setDepth(100000).setName(LOADING_OBJECT_NAME);
+  scene.load.on('progress', (progress: number) => {
+    if (!label.active) return;
+    label.setText(`LOADING ${Math.round(progress * 100)}%`);
+  });
+}
+
+export function hideSceneLoading(scene: Phaser.Scene): void {
+  scene.children.getByName(LOADING_OBJECT_NAME)?.destroy();
+}
+
 export function playClickSound(scene: Phaser.Scene): void {
   const audio = SHARED_AUDIO.uiClick;
   if (scene.cache.audio.exists(audio.key)) scene.sound.play(audio.key, { volume: audio.volume });

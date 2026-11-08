@@ -1,3 +1,5 @@
+import type Phaser from 'phaser';
+
 export const MECHA_SHOOTER_IMAGES = {
   player: { key: 'mecha-shooter:player', url: new URL('../assets/player.webp', import.meta.url).href },
   bossStage1: { key: 'mecha-shooter:boss-stage1', url: new URL('../assets/boss-stage1-cutout.webp', import.meta.url).href },
@@ -17,3 +19,13 @@ export const MECHA_SHOOTER_IMAGES = {
   stage2Turret: { key: 'mecha-shooter:stage2-turret', url: new URL('../assets/stage2-turret-crab.png', import.meta.url).href },
   stage2Splitter: { key: 'mecha-shooter:stage2-splitter', url: new URL('../assets/stage2-splitter-ray.png', import.meta.url).href },
 } as const;
+
+export function queueMechaShooterImages(scene: Phaser.Scene): number {
+  let queued = 0;
+  for (const image of Object.values(MECHA_SHOOTER_IMAGES)) {
+    if (scene.textures.exists(image.key)) continue;
+    scene.load.image(image.key, image.url);
+    queued += 1;
+  }
+  return queued;
+}

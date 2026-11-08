@@ -1,5 +1,5 @@
 import type { GameSceneData, RuntimeActions } from '@xinone/game-contracts';
-import { playClickSound, playOutcomeSound, playSharedBgm, type SharedBgmTrack } from '@xinone/shared-assets';
+import { hideSceneLoading, playClickSound, playOutcomeSound, playSharedBgm, showSceneLoading, type SharedBgmTrack } from '@xinone/shared-assets';
 import Phaser from 'phaser';
 import {
   BALL,
@@ -101,9 +101,11 @@ export class BreakoutGameScene extends Phaser.Scene {
     }
     const panelImage = BREAKOUT_PANEL_IMAGES[this.stageNumber - 1];
     if (!this.textures.exists(panelImage.key)) this.load.image(panelImage.key, panelImage.url);
+    showSceneLoading(this, '#ffd166');
   }
 
   create(): void {
+    hideSceneLoading(this);
     const bgmTrack = STAGE_BGM_ROTATION[(this.stageNumber - 1) % STAGE_BGM_ROTATION.length];
     playSharedBgm(this, bgmTrack);
     this.cameras.main.setBackgroundColor(0x0b1024);

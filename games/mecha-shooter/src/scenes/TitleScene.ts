@@ -1,6 +1,7 @@
 import type { GameSceneData, RuntimeActions } from '@xinone/game-contracts';
-import { playClickSound, playSharedBgm } from '@xinone/shared-assets';
+import { hideSceneLoading, playClickSound, playSharedBgm, showSceneLoading } from '@xinone/shared-assets';
 import Phaser from 'phaser';
+import { queueMechaShooterImages } from '../image-manifest';
 
 export const MECHA_SHOOTER_TITLE_SCENE = 'mecha-shooter:title';
 export const MECHA_SHOOTER_GAME_SCENE = 'mecha-shooter:game';
@@ -15,7 +16,13 @@ export class MechaShooterTitleScene extends Phaser.Scene {
   private runtime!: RuntimeActions;
   constructor() { super(MECHA_SHOOTER_TITLE_SCENE); }
   init(data: GameSceneData): void { this.runtime = data.runtime; }
+  preload(): void {
+    this.cameras.main.setBackgroundColor(0x090e1b);
+    queueMechaShooterImages(this);
+    showSceneLoading(this, '#ff8066');
+  }
   create(): void {
+    hideSceneLoading(this);
     playSharedBgm(this, 'title');
     this.cameras.main.setBackgroundColor(0x090e1b);
     this.add.text(640, 100, 'MECHA VANGUARD', { fontFamily: 'Arial Black', fontSize: '54px', color: '#ff8066' }).setOrigin(0.5);

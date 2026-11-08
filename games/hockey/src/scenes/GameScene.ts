@@ -1,5 +1,5 @@
 import type { GameSceneData, RuntimeActions } from '@xinone/game-contracts';
-import { playOutcomeSound, playSharedBgm } from '@xinone/shared-assets';
+import { hideSceneLoading, playOutcomeSound, playSharedBgm, showSceneLoading } from '@xinone/shared-assets';
 import Phaser from 'phaser';
 import { HOCKEY_AUDIO } from '../audio-manifest';
 import { HockeyMatch, RINK, type CpuDifficulty } from '../domain/hockey';
@@ -50,9 +50,11 @@ export class HockeyGameScene extends Phaser.Scene {
     for (const audio of Object.values(HOCKEY_AUDIO)) {
       if (!this.cache.audio.exists(audio.key)) this.load.audio(audio.key, audio.url);
     }
+    showSceneLoading(this, '#ff70d9');
   }
 
   create(): void {
+    hideSceneLoading(this);
     playSharedBgm(this, 'active');
     this.cameras.main.setBackgroundColor(0x0d071a);
     this.graphics = this.add.graphics();
